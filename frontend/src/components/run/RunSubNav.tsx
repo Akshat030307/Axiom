@@ -10,11 +10,11 @@ const TABS = [
   { key: "trace", label: "Trace" },
 ] as const;
 
-export function RunSubNav({ runId }: { runId: string }) {
+export function RunSubNav({ runId, className = "" }: { runId: string; className?: string }) {
   const pathname = usePathname() ?? "";
 
   return (
-    <nav className="mb-8 flex gap-1 border-b border-border">
+    <nav className={`mb-8 flex gap-1 border-b border-border ${className}`}>
       {TABS.map((tab) => {
         const href = `/research/${runId}/${tab.key}`;
         const active = pathname === href;

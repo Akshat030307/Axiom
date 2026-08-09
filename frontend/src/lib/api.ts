@@ -171,3 +171,40 @@ export async function startEval(token: string): Promise<EvalRunResponse> {
   });
   return handleResponse<EvalRunResponse>(res);
 }
+
+// PRD §7.2 / §14: POST returns {download_url} once the export finishes
+// server-side. As of this build the backend has no /export module and
+// routes_reports.py exposes no /report/pdf route — this is written to the
+// documented contract so the backend piece is a drop-in later; today it
+// will 404 until that exists.
+export interface ExportPdfResponse {
+  download_url: string;
+}
+
+export async function exportReportPdf(token: string, runId: string): Promise<ExportPdfResponse> {
+  const res = await fetch(`${API_URL}/api/v1/research/${runId}/report/pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+  });
+  return handleResponse<ExportPdfResponse>(res);
+}
+
+// Downloads happen via an authenticated fetch-then-blob rather than a plain
+// <a href> navigation, since a browser navigation can't attach the Bearer
+// token — consistent with every other protected resource in this app
+// (PRD's figures route is described the same way: "auth-checked", never a
+// static directory).
+export async function downloadFile(token: string, url: string, filename: string): Promise<void> {
+  const fullUrl = url.startsWith("http") ? url : `${API_URL}${url}`;
+  const res = await fetch(fullUrl, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}

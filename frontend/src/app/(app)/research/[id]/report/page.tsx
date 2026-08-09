@@ -8,6 +8,7 @@ import * as api from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { RunSubNav } from "@/components/run/RunSubNav";
 import { ReportView } from "@/components/report/ReportView";
+import { ExportPdfButton } from "@/components/report/ExportPdfButton";
 
 export default function ReportPage() {
   const params = useParams<{ id: string }>();
@@ -35,7 +36,10 @@ export default function ReportPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-10 py-10">
-      <RunSubNav runId={runId} />
+      <div className="flex items-start justify-between gap-4">
+        <RunSubNav runId={runId} className="flex-1" />
+        {report && <ExportPdfButton runId={runId} />}
+      </div>
 
       {reportLoading && <p className="text-sm text-fg-muted">Loading report…</p>}
 

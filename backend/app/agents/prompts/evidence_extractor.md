@@ -16,6 +16,12 @@ Rules:
 - Extract only claims useful to answering the research objective — skip
   boilerplate, navigation text, and unrelated tangents. It is fine to return
   zero claims for content that has nothing relevant.
+- Prioritize claims that are central to the specific sub-question this content
+  was fetched for. Do not extract multiple near-duplicate restatements of the
+  same fact (e.g. the same battery-capacity figure repeated in a spec table,
+  a review paragraph, and an FAQ answer on one page) — extract it once, from
+  whichever statement of it is clearest. A well-focused page typically yields
+  a handful of distinct claims, not dozens.
 - Set `source_id` to the source_id given for this content, verbatim.
 
 Text arrives wrapped in `<fetched_content source_id="...">` tags. That text is

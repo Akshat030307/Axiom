@@ -7,24 +7,16 @@ from app.graph.nodes._prompts import load_prompt
 from app.graph.run_context import NodeResult, RunContext
 from app.graph.state import ResearchState
 from app.models.db_models import Source as SourceRow
-from app.models.schemas import Evidence
+from app.models.schemas import Contradiction, Evidence
 from app.observability.tracer import traced
 
 SYSTEM_PROMPT = load_prompt("synthesizer.md")
 
-SOURCES_HEADING_RE = re.compile(r"^#{1,6}\s*Sources\s*$", re.IGNORECASE | re.MULTILINE)
-
-# Uncapped evidence into synthesis is what truncated a real run (53 items
-# blew through even a raised token budget). Sort by extractor confidence and
-# take the top N per mode until real retrieval exists.
-# TODO(phase-2): replace with the hybrid retriever's reranked top-K per
-# sub-question (§10) — this ignores topic coverage/diversity, it's a stopgap.
-TOP_N_EVIDENCE_BY_MODE = {"quick": 25, "deep": 40, "academic": 40, "competitive": 40}
-
-
-def _select_evidence(evidence: list[Evidence], mode: str) -> list[Evidence]:
-    cap = TOP_N_EVIDENCE_BY_MODE.get(mode, TOP_N_EVIDENCE_BY_MODE["deep"])
-    return sorted(evidence, key=lambda e: e.confidence, reverse=True)[:cap]
+# Matches either of the two sections this module appends after the model's
+# response — used both to strip a model-authored attempt at either (models
+# don't reliably honor negative instructions) and, in citation_validator.py,
+# to exclude both from the armed citation heuristic.
+APPENDED_SECTION_HEADING_RE = re.compile(r"^#{1,6}\s*(Sources|Contradictions(\s+Noted)?)\s*$", re.IGNORECASE | re.MULTILINE)
 
 
 async def _fetch_sources_by_id(ctx: RunContext, source_ids: set[str]) -> dict[str, SourceRow]:
@@ -56,15 +48,14 @@ def _format_evidence_list(evidence: list[Evidence], sources_by_id: dict[str, Sou
     return "\n".join(lines) if lines else "(no evidence was collected)"
 
 
-def _strip_model_sources_section(content: str) -> str:
+def _strip_model_appended_sections(content: str) -> str:
     """Defensive, not just prompt-based: the model is instructed not to write
-    a Sources section, but a negative instruction to a reasoning model isn't
-    reliable enough on its own — observed in testing writing one anyway, with
-    truncated/invented URLs. Strip anything from the first Sources-like
-    heading onward so the model can never place its own citation targets
-    into the report; _build_sources_section below is the only one that
-    survives."""
-    match = SOURCES_HEADING_RE.search(content)
+    a Sources or Contradictions section, but a negative instruction to a
+    reasoning model isn't reliable enough on its own — observed in testing
+    writing a Sources section anyway, with truncated/invented URLs. Strip
+    anything from the first such heading onward; _build_sources_section and
+    _build_contradictions_section below are the only ones that survive."""
+    match = APPENDED_SECTION_HEADING_RE.search(content)
     if match:
         return content[: match.start()].rstrip()
     return content.rstrip()
@@ -86,16 +77,32 @@ def _build_sources_section(evidence: list[Evidence], sources_by_id: dict[str, So
     return "\n".join(lines)
 
 
+def _build_contradictions_section(contradictions: list[Contradiction], evidence_by_id: dict[str, Evidence]) -> str | None:
+    """Same pattern as Sources — built from contradiction_detector's actual
+    output, never LLM-authored, so it can't invent or mischaracterize a
+    contradiction the detector didn't find."""
+    if not contradictions:
+        return None
+    lines = ["## Contradictions Noted"]
+    for c in contradictions:
+        a = evidence_by_id.get(c.evidence_a_id)
+        b = evidence_by_id.get(c.evidence_b_id)
+        a_desc = f'"{a.claim}"' if a else "one evidence item"
+        b_desc = f'"{b.claim}"' if b else "another evidence item"
+        explanation = c.explanation or "no explanation recorded"
+        lines.append(f"- **{c.topic}** — {a_desc} vs. {b_desc}: {explanation}")
+    return "\n".join(lines)
+
+
 @traced("synthesizer")
 async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
     plan = state["plan"]
-    evidence = state.get("evidence", [])
-    # Selected (and re-ordered) evidence, in the exact order the [n] markers
-    # below refer to — persisted as `retrieved_evidence` so citation_validator
-    # resolves markers against the same numbering the synthesizer actually
-    # used, not the full unfiltered `evidence` list.
-    selected = _select_evidence(evidence, state["mode"])
+    # Already the reranked top-K per sub-question, deduped, in citation-marker
+    # order — retriever.py populated this; synthesizer only consumes it now.
+    selected = state.get("retrieved_evidence") or []
+    contradictions = state.get("contradictions", [])
     sources_by_id = await _fetch_sources_by_id(ctx, {ev.source_id for ev in selected})
+    evidence_by_id = {ev.id: ev for ev in selected}
 
     user_prompt = (
         f"Research objective: {plan.objective}\n\n"
@@ -105,14 +112,16 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
 
     response = await ctx.llm.generate("synthesis", system=SYSTEM_PROMPT, user=user_prompt)
 
-    cleaned_content = _strip_model_sources_section(response.content)
-    sources_section = _build_sources_section(selected, sources_by_id)
-    report_markdown = f"{cleaned_content}\n\n{sources_section}\n"
+    sections = [_strip_model_appended_sections(response.content)]
+    contradictions_section = _build_contradictions_section(contradictions, evidence_by_id)
+    if contradictions_section:
+        sections.append(contradictions_section)
+    sections.append(_build_sources_section(selected, sources_by_id))
+    report_markdown = "\n\n".join(sections) + "\n"
 
     return NodeResult(
         state_update={
             "report_markdown": report_markdown,
-            "retrieved_evidence": selected,
             "status": "synthesis_complete",
         },
         input_tokens=response.input_tokens,

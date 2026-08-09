@@ -7,13 +7,16 @@ from app.graph.state import ResearchState
 from app.guardrails.sanitize import sanitize_text, wrap_fetched_content
 from app.models.db_models import Source
 from app.observability.tracer import traced
+from app.retrieval.chunking import select_relevant_chunks
 from app.tools.web_fetch import fetch_clean_text
 from app.tools.web_search import search
 
 settings = get_settings()
 
 RESULTS_PER_SUBQUESTION = 3
-# No credibility/scorer.py until Phase 2 — neutral placeholder for every source.
+# Placeholder until credibility_scorer runs later in this same graph and
+# UPDATEs every source's real score (corroboration counting needs evidence
+# to exist first, so it can't happen this early).
 DEFAULT_CREDIBILITY = 0.5
 
 
@@ -30,7 +33,7 @@ async def web_researcher_node(state: ResearchState, ctx: RunContext) -> NodeResu
     seen_urls: set[str] = set()
     tool_calls_used = 0
 
-    for sub_question in plan.sub_questions:
+    for sub_question_index, sub_question in enumerate(plan.sub_questions):
         if tool_calls_used >= settings.MAX_TOOL_CALLS_PER_NODE:
             errors.append("web_researcher: MAX_TOOL_CALLS_PER_NODE reached, remaining sub-questions skipped")
             break
@@ -59,6 +62,8 @@ async def web_researcher_node(state: ResearchState, ctx: RunContext) -> NodeResu
                 errors.append(f"web_researcher: no extractable content from {url}")
                 continue
 
+            text = select_relevant_chunks(text, sub_question)
+
             seen_urls.add(url)
             source_id = uuid.uuid4()
             ctx.db.add(
@@ -78,6 +83,7 @@ async def web_researcher_node(state: ResearchState, ctx: RunContext) -> NodeResu
                 {
                     "source_id": str(source_id),
                     "topic": sub_question,
+                    "sub_question_index": sub_question_index,
                     "fetched_content": wrap_fetched_content(text, str(source_id)),
                 }
             )

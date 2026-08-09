@@ -46,6 +46,13 @@ class LLMStructuredResponse:
     model: str
 
 
+@dataclass
+class EmbedResponse:
+    vectors: list[list[float]]
+    input_tokens: int
+    model: str
+
+
 class LLMProvider:
     """Provider-agnostic LLM interface (PRD §13) — no OpenAI-specific type may
     leak into graph/nodes/*. Model selection, reasoning-effort, and the
@@ -113,3 +120,17 @@ class LLMProvider:
             output_tokens=output_tokens,
             model=choice.model,
         )
+
+    async def embed(self, texts: list[str]) -> EmbedResponse:
+        """No task/tier routing — there's only one embedding model, unlike
+        generate/generate_structured. Returns [] vectors for [] input rather
+        than making a pointless API call."""
+        if not texts:
+            return EmbedResponse(vectors=[], input_tokens=0, model=self._settings.OPENAI_EMBEDDING_MODEL)
+        response = await self._client.embeddings.create(
+            model=self._settings.OPENAI_EMBEDDING_MODEL,
+            input=texts,
+        )
+        vectors = [item.embedding for item in response.data]
+        input_tokens = response.usage.prompt_tokens if response.usage else 0
+        return EmbedResponse(vectors=vectors, input_tokens=input_tokens, model=self._settings.OPENAI_EMBEDDING_MODEL)

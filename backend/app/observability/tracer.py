@@ -96,13 +96,18 @@ def traced(node_name: str) -> Callable[[NodeFn], Callable[[ResearchState, RunCon
                 raise
             finally:
                 latency_ms = int((time.monotonic() - t0) * 1000)
-                cost = estimate_cost(result.model, result.input_tokens, result.output_tokens)
+                cost = (
+                    result.cost_override
+                    if result.cost_override is not None
+                    else estimate_cost(result.model, result.input_tokens, result.output_tokens)
+                )
                 ctx.db.add(
                     NodeTrace(
                         id=uuid.uuid4(),
                         run_id=ctx.run_id,
                         node_name=node_name,
                         seq=seq,
+                        input=_truncate(result.trace_input) if result.trace_input else None,
                         output=_truncate(result.state_update) if status == "ok" else None,
                         input_tokens=result.input_tokens,
                         output_tokens=result.output_tokens,

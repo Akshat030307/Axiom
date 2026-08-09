@@ -39,7 +39,7 @@ def _batches(items: list[dict], size: int):
 @traced("evidence_extractor")
 async def evidence_extractor_node(state: ResearchState, ctx: RunContext) -> NodeResult:
     raw_findings = state.get("raw_findings", [])
-    source_id_to_topic = {f["source_id"]: f["topic"] for f in raw_findings}
+    source_id_to_meta = {f["source_id"]: (f["topic"], f["sub_question_index"]) for f in raw_findings}
 
     evidence: list[Evidence] = []
     errors: list[str] = []
@@ -66,10 +66,11 @@ async def evidence_extractor_node(state: ResearchState, ctx: RunContext) -> Node
         model_used = response.model
 
         for item in response.parsed.items:
-            topic = source_id_to_topic.get(item.source_id)
-            if topic is None:
+            meta = source_id_to_meta.get(item.source_id)
+            if meta is None:
                 errors.append(f"evidence_extractor: model returned unknown source_id {item.source_id}, dropped")
                 continue
+            topic, sub_question_index = meta
 
             evidence_id = uuid.uuid4()
             ev = Evidence(
@@ -80,6 +81,7 @@ async def evidence_extractor_node(state: ResearchState, ctx: RunContext) -> Node
                 confidence=item.confidence,
                 agent="web_researcher",
                 topic=topic,
+                sub_question_index=sub_question_index,
                 numeric_value=item.numeric_value,
                 numeric_unit=item.numeric_unit,
                 time_period=item.time_period,
@@ -98,7 +100,10 @@ async def evidence_extractor_node(state: ResearchState, ctx: RunContext) -> Node
                     numeric_value=ev.numeric_value,
                     numeric_unit=ev.numeric_unit,
                     time_period=ev.time_period,
-                    metadata_=ev.metadata,
+                    # sub_question_index isn't a DB column (nothing queries by
+                    # it in SQL) — kept in metadata JSONB alongside whatever
+                    # else ends up there.
+                    metadata_={**ev.metadata, "sub_question_index": sub_question_index},
                 )
             )
 

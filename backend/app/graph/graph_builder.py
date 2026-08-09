@@ -9,8 +9,12 @@ from app.graph.nodes.citation_validator import (
     force_finalize_node,
     route_after_validation,
 )
+from app.graph.nodes.contradiction_detector import contradiction_detector_node
+from app.graph.nodes.credibility_scorer import credibility_scorer_node
 from app.graph.nodes.evidence_extractor import evidence_extractor_node
+from app.graph.nodes.fact_checker import fact_checker_node
 from app.graph.nodes.planner import planner_node
+from app.graph.nodes.retriever import retriever_node
 from app.graph.nodes.synthesizer import synthesizer_node
 from app.graph.nodes.web_researcher import web_researcher_node
 from app.graph.run_context import RunContext
@@ -35,12 +39,24 @@ def build_graph(ctx: RunContext, checkpointer: BaseCheckpointSaver) -> CompiledS
     """Rebuilt per run (cheap — no I/O) so each run's node closures capture
     that run's own RunContext/DB session (see RunContext's docstring on why a
     request-scoped session can't be reused here). The checkpointer instance
-    itself is long-lived and shared across runs."""
+    itself is long-lived and shared across runs.
+
+    Phase 2 topology, matching PRD §8's node listing order: credibility_scorer
+    runs before retriever because corroboration-based scoring needs evidence
+    embeddings and is the first node that needs them (retriever reuses them —
+    ensure_evidence_embeddings is idempotent); fact_checker and
+    contradiction_detector run on retrieved_evidence, before synthesizer, so
+    their output can inform the report (contradictions get their own section).
+    """
     builder = StateGraph(ResearchState)
 
     builder.add_node("planner", _bind(planner_node, ctx))
     builder.add_node("web_researcher", _bind(web_researcher_node, ctx))
     builder.add_node("evidence_extractor", _bind(evidence_extractor_node, ctx))
+    builder.add_node("credibility_scorer", _bind(credibility_scorer_node, ctx))
+    builder.add_node("retriever", _bind(retriever_node, ctx))
+    builder.add_node("fact_checker", _bind(fact_checker_node, ctx))
+    builder.add_node("contradiction_detector", _bind(contradiction_detector_node, ctx))
     builder.add_node("synthesizer", _bind(synthesizer_node, ctx))
     builder.add_node("citation_validator", _bind(citation_validator_node, ctx))
     builder.add_node("force_finalize", _bind(force_finalize_node, ctx))
@@ -48,7 +64,11 @@ def build_graph(ctx: RunContext, checkpointer: BaseCheckpointSaver) -> CompiledS
     builder.add_edge(START, "planner")
     builder.add_edge("planner", "web_researcher")
     builder.add_edge("web_researcher", "evidence_extractor")
-    builder.add_edge("evidence_extractor", "synthesizer")
+    builder.add_edge("evidence_extractor", "credibility_scorer")
+    builder.add_edge("credibility_scorer", "retriever")
+    builder.add_edge("retriever", "fact_checker")
+    builder.add_edge("fact_checker", "contradiction_detector")
+    builder.add_edge("contradiction_detector", "synthesizer")
     builder.add_edge("synthesizer", "citation_validator")
     builder.add_conditional_edges(
         "citation_validator",

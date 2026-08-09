@@ -13,14 +13,17 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 CITATION_MARKER_RE = re.compile(r"\[(\d+)\]")
-SOURCES_HEADING_RE = re.compile(r"^#{1,6}\s*Sources\s*$", re.IGNORECASE)
+# Matches either of synthesizer.py's two programmatically-appended sections
+# (Sources, Contradictions Noted) — both are structured data, never
+# LLM-authored prose, so neither belongs in the claim/marker heuristic below.
+APPENDED_SECTION_HEADING_RE = re.compile(r"^#{1,6}\s*(Sources|Contradictions(\s+Noted)?)\s*$", re.IGNORECASE)
 MIN_FLAGGED_SENTENCE_LEN = 40
 
 
-def _strip_sources_section(markdown: str) -> str:
+def _strip_appended_sections(markdown: str) -> str:
     lines = markdown.splitlines()
     for i, line in enumerate(lines):
-        if SOURCES_HEADING_RE.match(line.strip()):
+        if APPENDED_SECTION_HEADING_RE.match(line.strip()):
             return "\n".join(lines[:i])
     return markdown
 
@@ -53,7 +56,7 @@ def _find_flagged_sentences(markdown: str) -> list[str]:
     [n] marker nor an explicit (unverified) tag. A heuristic approximation of
     PRD §8's citation_validator check (b), not a semantic judgment."""
     flagged = []
-    for line in _strip_sources_section(markdown).splitlines():
+    for line in _strip_appended_sections(markdown).splitlines():
         if _is_structural_line(line):
             continue
         for sentence in _split_sentences(line):
@@ -124,15 +127,12 @@ async def citation_validator_node(state: ResearchState, ctx: RunContext) -> Node
     for sentence in flagged:
         logger.warning("citation_validator[%s]: unmarked claim-like sentence: %r", ctx.run_id, sentence[:160])
 
+    # Armed for real as of Phase 2 (was forced to True in Phase 1 — see the
+    # commit history if you need the old bypass). Headings, list items, table
+    # rows, and both appended sections (Sources, Contradictions Noted) are
+    # excluded from the check above, so this shouldn't false-positive on
+    # structural or programmatic content — only on genuinely unmarked prose.
     passed = not unresolved and not flagged
-    # TODO(phase-2): stop forcing this to True once the heuristic above is
-    # reliable enough not to burn a reasoning-tier synthesizer retry on a
-    # false positive. Headings/lists/tables/the Sources section are already
-    # excluded, but sentence-level coverage is still approximate — for Phase 1
-    # we log violations and always pass so the retry loop never arms. The
-    # retry/force_finalize wiring and the increment-on-failure logic below are
-    # otherwise fully implemented and correct.
-    passed = True
 
     if passed:
         citations = _build_citations(markdown, evidence)

@@ -35,6 +35,13 @@ class Evidence(BaseModel):
     confidence: float
     agent: AgentName
     topic: str
+    # Which plan.sub_questions[i] this evidence was extracted for. topic is
+    # LLM-assigned free text and too fragile to group on reliably (a one-word
+    # paraphrase means an evidence item silently matches no group) — this is
+    # the stable key retriever/fact_checker/contradiction_detector group on.
+    # Not persisted as its own DB column (kept in the metadata JSONB instead,
+    # see evidence_extractor.py) since nothing needs to query by it in SQL.
+    sub_question_index: int | None = None
     numeric_value: float | None = None
     numeric_unit: str | None = None
     time_period: str | None = None

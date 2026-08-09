@@ -46,18 +46,30 @@ class Settings(BaseSettings):
     RUN_TIMEOUT_SECONDS: int = 900
     TOOL_TIMEOUT_SECONDS: int = 30
 
-    # Retrieval tuning (unused until Phase 2, kept so config shape is stable)
-    DEDUPE_THRESHOLD: float = 0.92
+    # Retrieval tuning
+    DEDUPE_THRESHOLD: float = 0.92  # reserved for the not-yet-built dedupe node
     TOP_K_PER_SUBQUESTION: int = 8
     RRF_K: int = 60
     CONTRADICTION_NUMERIC_THRESHOLD: float = 0.15
     RERANK_CANDIDATE_LIMIT: int = 30
+    # "These two evidence items are about the same underlying fact" — used by
+    # fact_checker's clustering (§9) and credibility_scorer's corroboration
+    # counting. Deliberately a separate constant from DEDUPE_THRESHOLD even
+    # though both are cosine similarity on evidence embeddings — they serve
+    # different nodes with different tolerances.
+    CLAIM_SIMILARITY_THRESHOLD: float = 0.90
+    # Looser than CLAIM_SIMILARITY_THRESHOLD on purpose: contradiction_detector
+    # clusters numeric claims by *subject* ("battery capacity is 30.2 kWh" vs
+    # "... is 45 kWh" are semantically near but not identical — they need to
+    # land in the same cluster to ever get compared), not by near-duplication.
+    CONTRADICTION_CLUSTER_THRESHOLD: float = 0.75
 
     # Reasoning effort per task tier ("none" means: don't pass reasoning_effort at all)
     EFFORT_EXTRACTION: str = "none"
     EFFORT_VERIFICATION: str = "low"
     EFFORT_PLANNING: str = "medium"
     EFFORT_SYNTHESIS: str = "medium"
+    EFFORT_CONTRADICTION: str = "low"
 
     # Ops
     ENV: str = "development"

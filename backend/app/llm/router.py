@@ -24,6 +24,11 @@ ROUTES: dict[str, Route] = {
     "planning": Route(tier="reasoning", effort_field="EFFORT_PLANNING", max_completion_tokens=2000),
     "synthesis": Route(tier="reasoning", effort_field="EFFORT_SYNTHESIS", max_completion_tokens=16000),
     "extraction": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=3000),
+    # Phase 2 additions —
+    "reranking": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=1500),
+    "fact_check_verification": Route(tier="fast", effort_field="EFFORT_VERIFICATION", max_completion_tokens=800),
+    "classification": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=1000),
+    "contradiction_resolution": Route(tier="reasoning", effort_field="EFFORT_CONTRADICTION", max_completion_tokens=1500),
 }
 
 

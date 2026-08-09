@@ -1,7 +1,74 @@
 @import "tailwindcss";
 
-/* Phase 1: functional layout only — no dark monochrome theme/tokens yet.
-   Those land with the designed UI (PRD §15), out of scope for this phase. */
+@theme {
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-raised: #111111;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
+  --color-fg: #fafafa;
+  --color-fg-muted: #8b8b8b;
+  --color-fg-subtle: #5a5a5a;
+  --color-accent: #ffffff;
+
+  --radius-card: 18px;
+  --radius-pill: 9999px;
+  --radius-input: 14px;
+
+  /* Populated via the CSS variables next/font generates on <html> in
+     layout.tsx (--font-inter-tight / --font-inter). -apple-system comes
+     first so Apple devices render true SF; everyone else gets the
+     self-hosted Inter fallback — SF Pro itself is not licensed for web
+     self-hosting (PRD §15.1). */
+  --font-display: -apple-system, "SF Pro Display", var(--font-inter-tight), system-ui, sans-serif;
+  --font-body: -apple-system, "SF Pro Text", var(--font-inter), system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
 body {
   min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Hero horizon ambient drift — slow (70s+) so it reads as ambient rather
+   than a screensaver (PRD §15.0). Reduced-motion is handled by the global
+   rule above, which collapses this to a single static frame. */
+@keyframes horizon-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(4px, -6px);
+  }
+}
+.hero-horizon-drift {
+  animation: horizon-drift 72s ease-in-out infinite;
+}
+
+/* Breathing glow on the active progress node (PRD §15.1 motion spec). */
+@keyframes breathing-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
+  }
+}
+.hero-breathing {
+  animation: breathing-glow 2.4s ease-in-out infinite;
 }

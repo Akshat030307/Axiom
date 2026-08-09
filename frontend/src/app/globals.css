@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Phase 1: functional layout only — no dark monochrome theme/tokens yet.
+   Those land with the designed UI (PRD §15), out of scope for this phase. */
+body {
+  min-height: 100vh;
+}

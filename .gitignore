@@ -1,0 +1,28 @@
+# Secrets
+.env
+*.env.local
+
+# Claude Code harness-local state (not project content)
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+out/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+
+# Data volumes (bind-mounted in dev, not committed)
+data/

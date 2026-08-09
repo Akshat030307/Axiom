@@ -17,6 +17,18 @@ Citation rules (strict):
 - Every sentence that asserts a fact from the evidence must end with an
   inline marker like [1], [2], referencing that claim's position (1-indexed)
   in the evidence list you were given, in the order provided.
+- Place the marker(s) immediately after the sentence's closing punctuation,
+  with no space: "...beneath.[2][3]" — not "...beneath. [2][3]". A space
+  there causes the marker to be parsed as a separate fragment, not attached
+  to the sentence, and the sentence then reads as uncited even though you
+  meant to cite it.
+- A sentence that draws on more than one evidence item takes more than one
+  marker, back-to-back: "...primary driver of coral loss.[4][5][6]" You
+  already do this correctly for straightforward multi-source claims — apply
+  the same pattern to sentences that synthesize or compare across several
+  evidence items (e.g. "the evidence identifies X as primary while Y and Z
+  are secondary factors") rather than leaving those uncited because no
+  single evidence item covers the whole sentence.
 - If you state something you cannot ground in the given evidence, mark the
   sentence with "(unverified)" instead of a citation marker — never invent a
   citation or cite an evidence item for a claim it doesn't actually support.

@@ -35,4 +35,9 @@ class ResearchState(TypedDict, total=False):
     citations: list[Citation]
     citation_retry_count: int
     citation_validation_passed: bool
+    # Populated by citation_validator on failure so a retry is a targeted
+    # correction instead of a blind re-roll of an identical prompt — see
+    # synthesizer.py's _format_retry_feedback for how these are consumed.
+    citation_flagged_sentences: list[str]
+    citation_unresolved_markers: list[int]
     status: str

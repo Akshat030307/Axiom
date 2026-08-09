@@ -77,6 +77,59 @@ def _build_sources_section(evidence: list[Evidence], sources_by_id: dict[str, So
     return "\n".join(lines)
 
 
+def _format_retry_feedback(state: ResearchState) -> str | None:
+    """Built from the previous citation_validator failure so a retry is a
+    targeted correction, not a blind re-roll with an identical prompt.
+
+    Investigation finding (2026-08-10): before this existed, `route_after_
+    validation`'s "retry" edge sent execution straight back to this node
+    with no signal that a previous attempt existed at all, let alone what
+    failed in it — same system prompt, same user prompt, so a second
+    LangGraph pass through this node was pure sampling variance. Confirmed
+    by diffing two real attempts on the same run: the same handful of
+    claims recurred, reworded, still failing the same check.
+
+    Deliberately gives the model both ways to satisfy the check (attach a
+    marker, or rewrite the sentence so it no longer asserts an uncited
+    fact) rather than only "add a citation" — a model told only to fix
+    citations will invent one to make the check pass, which is worse than
+    an honest (unverified) tag."""
+    flagged = state.get("citation_flagged_sentences") or []
+    unresolved = state.get("citation_unresolved_markers") or []
+    if not flagged and not unresolved:
+        return None
+
+    lines = [
+        "\nYour previous draft failed citation validation. Fix ONLY the following; "
+        "do not introduce new uncited claims elsewhere."
+    ]
+    if flagged:
+        lines.append(
+            "\nThese sentences asserted a fact but carried neither a [n] marker nor "
+            "an (unverified) tag (quoted verbatim from your previous draft):"
+        )
+        lines.extend(f'- "{sentence}"' for sentence in flagged)
+        lines.append(
+            "\nFor each one, either: (a) attach the correct [n] marker(s) — "
+            "including more than one, e.g. [2][5], if the sentence draws on "
+            "several evidence items — if the evidence list actually supports it, "
+            "or (b) rewrite the sentence so it no longer asserts an uncited fact "
+            "(generalize it, drop the specific claim, or tag it \"(unverified)\"). "
+            "Do not invent or guess a citation just to satisfy this check — an "
+            "incorrect marker is worse than an honest (unverified) tag. When you "
+            "do attach markers, place them immediately after the sentence's "
+            "closing punctuation with no space, e.g. \"...beneath.[2][3]\" not "
+            "\"...beneath. [2][3]\"."
+        )
+    if unresolved:
+        marker_list = ", ".join(f"[{m}]" for m in unresolved)
+        lines.append(
+            f"\nThese marker numbers do not correspond to any evidence item you "
+            f"were given and must be removed or corrected: {marker_list}."
+        )
+    return "\n".join(lines)
+
+
 def _build_contradictions_section(contradictions: list[Contradiction], evidence_by_id: dict[str, Evidence]) -> str | None:
     """Same pattern as Sources — built from contradiction_detector's actual
     output, never LLM-authored, so it can't invent or mischaracterize a
@@ -109,6 +162,10 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
         "Sub-questions:\n" + "\n".join(f"- {q}" for q in plan.sub_questions) + "\n\n"
         f"Evidence (cite each by its bracketed number below):\n{_format_evidence_list(selected, sources_by_id)}\n"
     )
+
+    retry_feedback = _format_retry_feedback(state)
+    if retry_feedback:
+        user_prompt += retry_feedback
 
     # Streams report_chunk frames as tokens arrive (design streams the report
     # as it writes) rather than one blocking call. The post-processing below

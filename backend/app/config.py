@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://redis:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
     FIGURES_DIR: str = "/data/figures"
+    EXPORTS_DIR: str = "/data/exports"
 
     # Auth
     JWT_SECRET: str

@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock
+# PRD §14: installed at build time, never at runtime.
+RUN playwright install --with-deps chromium
 
 COPY alembic.ini ./
 COPY app ./app

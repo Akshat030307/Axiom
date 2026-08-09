@@ -1,23 +1,25 @@
 "use client";
 
 import { Children, Fragment, useMemo, useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { Modal } from "@/components/ui/Modal";
-import type { Citation, EvidenceResponse } from "@/types/api";
+import type { Citation, EvidenceResponse, FigureResponse } from "@/types/api";
 import { CitationMarker } from "./CitationMarker";
 import { CitationViewer } from "./CitationViewer";
+import { ReportFigure } from "./ReportFigure";
 
 interface ReportViewProps {
   markdown: string;
   citations: Citation[];
   evidenceById: Map<string, EvidenceResponse>;
+  figuresById: Map<string, FigureResponse>;
 }
 
-// The synthesizer may emit `![caption](figure://{id})` placeholders (PRD
-// §8), but figures are out of scope for Phase 4 — no backend route serves
-// them yet. Render a plain placeholder instead of a broken <img>.
+// A `figure://{id}` that isn't in figuresById is either a genuine backend
+// hiccup (figure row deleted, etc.) or an older report generated before
+// figures existed — either way, plain text beats a broken image.
 function FigurePlaceholder({ alt }: { alt?: string }) {
   return (
     <span className="my-3 flex h-28 w-full items-center justify-center rounded-input border border-dashed border-border text-xs text-fg-subtle">
@@ -39,7 +41,7 @@ const PROSE_CLASSES =
   "[&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-fg-muted " +
   "[&_hr]:my-6 [&_hr]:border-border";
 
-export function ReportView({ markdown, citations, evidenceById }: ReportViewProps) {
+export function ReportView({ markdown, citations, evidenceById, figuresById }: ReportViewProps) {
   const [openMarker, setOpenMarker] = useState<number | null>(null);
 
   const citationByMarker = useMemo(() => {
@@ -70,6 +72,10 @@ export function ReportView({ markdown, citations, evidenceById }: ReportViewProp
       <article className={PROSE_CLASSES}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
+          // react-markdown's default urlTransform blanks any scheme outside
+          // http(s)/irc(s)/mailto/xmpp, which silently empties our
+          // `figure://{id}` src before the custom `img` renderer ever sees it.
+          urlTransform={(url) => (url.startsWith("figure://") ? url : defaultUrlTransform(url))}
           components={{
             p: ({ children }) => <p>{withCitations(children)}</p>,
             li: ({ children }) => <li>{withCitations(children)}</li>,
@@ -79,7 +85,10 @@ export function ReportView({ markdown, citations, evidenceById }: ReportViewProp
             h3: ({ children }) => <h3>{withCitations(children)}</h3>,
             img: ({ src, alt }) => {
               if (typeof src === "string" && src.startsWith("figure://")) {
-                return <FigurePlaceholder alt={alt} />;
+                const figureId = src.slice("figure://".length);
+                const figure = figuresById.get(figureId);
+                if (!figure) return <FigurePlaceholder alt={alt} />;
+                return <ReportFigure figureId={figure.id} caption={figure.caption} />;
               }
               // eslint-disable-next-line @next/next/no-img-element -- external report images aren't known to next/image
               return <img src={src} alt={alt ?? ""} className="my-3 max-w-full rounded-input" />;

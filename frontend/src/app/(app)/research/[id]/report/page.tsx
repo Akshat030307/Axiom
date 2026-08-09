@@ -32,7 +32,14 @@ export default function ReportPage() {
     enabled: !!accessToken && !!runId,
   });
 
+  const { data: figures } = useQuery({
+    queryKey: ["figures", runId],
+    queryFn: () => api.listFigures(accessToken!, runId),
+    enabled: !!accessToken && !!runId,
+  });
+
   const evidenceById = useMemo(() => new Map((evidence ?? []).map((e) => [e.id, e])), [evidence]);
+  const figuresById = useMemo(() => new Map((figures ?? []).map((f) => [f.id, f])), [figures]);
 
   return (
     <main className="mx-auto max-w-3xl px-10 py-10">
@@ -49,7 +56,14 @@ export default function ReportPage() {
         </p>
       )}
 
-      {report && <ReportView markdown={report.markdown} citations={report.citations} evidenceById={evidenceById} />}
+      {report && (
+        <ReportView
+          markdown={report.markdown}
+          citations={report.citations}
+          evidenceById={evidenceById}
+          figuresById={figuresById}
+        />
+      )}
     </main>
   );
 }

@@ -6,6 +6,7 @@ import type {
   EvalRunResponse,
   EvalStatusResponse,
   EvidenceResponse,
+  FigureResponse,
   NodeTraceResponse,
   RefreshResponse,
   ReportResponse,
@@ -207,4 +208,19 @@ export async function downloadFile(token: string, url: string, filename: string)
   a.click();
   a.remove();
   URL.revokeObjectURL(objectUrl);
+}
+
+export async function listFigures(token: string, runId: string): Promise<FigureResponse[]> {
+  const res = await fetch(`${API_URL}/api/v1/research/${runId}/figures`, { headers: authHeaders(token) });
+  return handleResponse<FigureResponse[]>(res);
+}
+
+// Same reasoning as downloadFile: a plain <img src> can't carry a Bearer
+// token, so the bytes are fetched authenticated and handed back as a blob
+// URL for the caller to set as the image source.
+export async function fetchFigureObjectUrl(token: string, figureId: string): Promise<string> {
+  const res = await fetch(`${API_URL}/api/v1/figures/${figureId}/file`, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error(`Failed to load figure (${res.status})`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }

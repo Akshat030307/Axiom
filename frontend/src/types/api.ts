@@ -180,3 +180,12 @@ export interface EvalListResponse {
 export interface EvalRunResponse {
   eval_id: string;
 }
+
+export interface FigureResponse {
+  id: string;
+  kind: string;
+  caption: string;
+  alt_text: string;
+  mime_type: string;
+  evidence_ids: string[];
+}

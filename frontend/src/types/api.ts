@@ -124,3 +124,59 @@ export interface NodeTraceResponse {
   started_at: string | null;
   ended_at: string | null;
 }
+
+export interface EvalConfigResponse {
+  dataset_size: number;
+  max_eval_cost_usd: number;
+}
+
+export type EvalRunStatus = "running" | "completed" | "aborted_cost_ceiling";
+
+export interface EvalQuestionResult {
+  run_id: string;
+  status?: string;
+  reused_existing_run?: boolean;
+  latency_seconds?: number | null;
+  cost_usd?: number;
+  new_spend_usd?: number;
+  sources?: number;
+  citation_accuracy?: number | null;
+  claim_verification?: number | null;
+  task_completion?: number | null;
+  error?: string;
+}
+
+export interface EvalMetrics {
+  status?: EvalRunStatus;
+  per_question?: Record<string, EvalQuestionResult>;
+  dataset_size?: number;
+  questions_completed?: number;
+  citation_accuracy?: number | null;
+  claim_verification?: number | null;
+  task_completion?: number | null;
+  avg_latency_seconds?: number | null;
+  avg_cost_usd?: number | null;
+  avg_sources?: number | null;
+}
+
+export interface EvalStatusResponse {
+  id: string;
+  dataset_version: string | null;
+  created_at: string;
+  metrics: EvalMetrics;
+}
+
+export interface EvalListItem {
+  id: string;
+  dataset_version: string | null;
+  created_at: string;
+  status: string | null;
+}
+
+export interface EvalListResponse {
+  items: EvalListItem[];
+}
+
+export interface EvalRunResponse {
+  eval_id: string;
+}

@@ -1,16 +1,35 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.config import get_settings
 from app.db.session import get_db
-from app.eval.runner import DATASET_VERSION, run_eval_dataset
+from app.eval.runner import DATASET_VERSION, load_dataset, run_eval_dataset
 from app.models.db_models import EvalRun, User
 
 router = APIRouter(prefix="/api/v1/eval", tags=["eval"])
+settings = get_settings()
+
+
+class EvalConfigResponse(BaseModel):
+    dataset_size: int
+    max_eval_cost_usd: float
+
+
+class EvalListItem(BaseModel):
+    id: uuid.UUID
+    dataset_version: str | None
+    created_at: datetime
+    status: str | None
+
+
+class EvalListResponse(BaseModel):
+    items: list[EvalListItem]
 
 
 class EvalRunRequest(BaseModel):
@@ -61,6 +80,39 @@ async def start_eval(
     existing_run_ids = body.existing_run_ids if body else None
     background_tasks.add_task(run_eval_dataset, eval_id, user.id, existing_run_ids)
     return EvalRunResponse(eval_id=eval_id)
+
+
+@router.get("/config", response_model=EvalConfigResponse)
+async def get_eval_config(user: User = Depends(get_current_user)) -> EvalConfigResponse:
+    """Backs the "Run evaluation" confirmation dialog — real numbers (the
+    actual dataset size and the actual enforced cost ceiling), not a
+    fabricated estimate. Declared before `/{eval_id}` so "config" isn't
+    swallowed as a (invalid) UUID path param."""
+    return EvalConfigResponse(dataset_size=len(load_dataset()), max_eval_cost_usd=settings.MAX_EVAL_COST_USD)
+
+
+@router.get("", response_model=EvalListResponse)
+async def list_evals(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> EvalListResponse:
+    """eval_runs has no user_id column (PRD §6 — the dataset is a shared
+    benchmark, not per-user data), so this lists every eval run regardless
+    of who triggered it, same as any authenticated user hitting /eval/{id}
+    directly already could."""
+    rows = (await db.scalars(select(EvalRun).order_by(EvalRun.created_at.desc()).limit(limit))).all()
+    return EvalListResponse(
+        items=[
+            EvalListItem(
+                id=r.id,
+                dataset_version=r.dataset_version,
+                created_at=r.created_at,
+                status=(r.metrics or {}).get("status"),
+            )
+            for r in rows
+        ]
+    )
 
 
 @router.get("/{eval_id}", response_model=EvalStatusResponse)

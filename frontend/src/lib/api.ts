@@ -1,6 +1,10 @@
 import type {
   ContradictionResponse,
   CreateRunResponse,
+  EvalConfigResponse,
+  EvalListResponse,
+  EvalRunResponse,
+  EvalStatusResponse,
   EvidenceResponse,
   NodeTraceResponse,
   RefreshResponse,
@@ -142,4 +146,28 @@ export async function listTrace(token: string, runId: string): Promise<NodeTrace
     headers: authHeaders(token),
   });
   return handleResponse<NodeTraceResponse[]>(res);
+}
+
+export async function getEvalConfig(token: string): Promise<EvalConfigResponse> {
+  const res = await fetch(`${API_URL}/api/v1/eval/config`, { headers: authHeaders(token) });
+  return handleResponse<EvalConfigResponse>(res);
+}
+
+export async function listEvals(token: string, limit = 20): Promise<EvalListResponse> {
+  const res = await fetch(`${API_URL}/api/v1/eval?limit=${limit}`, { headers: authHeaders(token) });
+  return handleResponse<EvalListResponse>(res);
+}
+
+export async function getEval(token: string, evalId: string): Promise<EvalStatusResponse> {
+  const res = await fetch(`${API_URL}/api/v1/eval/${evalId}`, { headers: authHeaders(token) });
+  return handleResponse<EvalStatusResponse>(res);
+}
+
+export async function startEval(token: string): Promise<EvalRunResponse> {
+  const res = await fetch(`${API_URL}/api/v1/eval/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({}),
+  });
+  return handleResponse<EvalRunResponse>(res);
 }

@@ -13,6 +13,14 @@ reliable enough to produce one yourself), the second from a separate
 contradiction-detection step you don't have visibility into. Inventing
 either is exactly what you must not do.
 
+Figures: you may be given a list of already-generated figures (id + caption).
+Reference one, at most once, by placing `![caption](figure://{id})` on its
+own line at the point in the report where it's genuinely useful — right
+after the sentence(s) it illustrates, not bunched at the end. Use only the
+exact ids you were given; never invent one. Most reports have zero or very
+few figures — do not force a reference to one that doesn't clearly support
+what you're saying at that point, and never reference the same figure twice.
+
 Citation rules (strict):
 - Every sentence that asserts a fact from the evidence must end with an
   inline marker like [1], [2], referencing that claim's position (1-indexed)

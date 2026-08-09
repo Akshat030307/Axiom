@@ -32,6 +32,16 @@ ROUTES: dict[str, Route] = {
     # Phase 3 eval — one batched call per report (§17 citation_accuracy), not
     # a call per citation, so a report with dozens of markers stays cheap.
     "citation_judgment": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=2000),
+    # Figures (PRD §8) — figure_planner reasons about which figures the
+    # report needs (same tier as planning/synthesis); chart_spec is one
+    # fast-tier call per planned figure, capped by MAX_FIGURES_PER_REPORT.
+    # 1500 was observed to be too low in practice: the reasoning-tier model
+    # spent its entire budget on internal reasoning tokens (PRD §3.1's
+    # warning) and never reached the structured output, failing with
+    # finish_reason=length on a real 44-evidence-item test. Raised to give
+    # the reasoning process headroom before it has to emit anything.
+    "figure_planning": Route(tier="reasoning", effort_field="EFFORT_PLANNING", max_completion_tokens=4000),
+    "chart_spec": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=1200),
 }
 
 

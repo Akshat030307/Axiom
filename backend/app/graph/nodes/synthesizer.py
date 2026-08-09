@@ -1,3 +1,4 @@
+import logging
 import re
 import uuid
 
@@ -7,8 +8,10 @@ from app.graph.nodes._prompts import load_prompt
 from app.graph.run_context import NodeResult, RunContext
 from app.graph.state import ResearchState
 from app.models.db_models import Source as SourceRow
-from app.models.schemas import Contradiction, Evidence
+from app.models.schemas import Contradiction, Evidence, Figure
 from app.observability.tracer import traced
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = load_prompt("synthesizer.md")
 
@@ -17,6 +20,7 @@ SYSTEM_PROMPT = load_prompt("synthesizer.md")
 # don't reliably honor negative instructions) and, in citation_validator.py,
 # to exclude both from the armed citation heuristic.
 APPENDED_SECTION_HEADING_RE = re.compile(r"^#{1,6}\s*(Sources|Contradictions(\s+Noted)?)\s*$", re.IGNORECASE | re.MULTILINE)
+FIGURE_MARKDOWN_RE = re.compile(r"!\[([^\]]*)\]\(figure://([^)\s]+)\)")
 
 
 async def _fetch_sources_by_id(ctx: RunContext, source_ids: set[str]) -> dict[str, SourceRow]:
@@ -46,6 +50,30 @@ def _format_evidence_list(evidence: list[Evidence], sources_by_id: dict[str, Sou
             f"    source: {_describe_source(source)}"
         )
     return "\n".join(lines) if lines else "(no evidence was collected)"
+
+
+def _format_figures_list(figures: list[Figure]) -> str:
+    if not figures:
+        return "(none were generated for this report — do not reference any figure://)"
+    return "\n".join(f"- figure://{fig.id} — {fig.caption}" for fig in figures)
+
+
+def _strip_invalid_figure_refs(content: str, valid_figure_ids: set[str]) -> str:
+    """Defensive, same rationale as _strip_model_appended_sections: citation_
+    validator doesn't check figure:// references (PRD §8 check (c) isn't
+    wired up in this build), so an id the model got wrong or invented would
+    otherwise reach the client as a permanently-broken image reference.
+    Dropped rather than left in place — ReportView's placeholder for a
+    missing figure is more confusing than the sentence simply not having one."""
+
+    def _replace(match: "re.Match[str]") -> str:
+        caption, figure_id = match.group(1), match.group(2)
+        if figure_id in valid_figure_ids:
+            return match.group(0)
+        logger.warning("synthesizer: dropping reference to unknown figure id %r (caption=%r)", figure_id, caption)
+        return ""
+
+    return FIGURE_MARKDOWN_RE.sub(_replace, content)
 
 
 def _strip_model_appended_sections(content: str) -> str:
@@ -154,13 +182,18 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
     # order — retriever.py populated this; synthesizer only consumes it now.
     selected = state.get("retrieved_evidence") or []
     contradictions = state.get("contradictions", [])
+    figures = state.get("figures") or []
     sources_by_id = await _fetch_sources_by_id(ctx, {ev.source_id for ev in selected})
     evidence_by_id = {ev.id: ev for ev in selected}
 
     user_prompt = (
         f"Research objective: {plan.objective}\n\n"
         "Sub-questions:\n" + "\n".join(f"- {q}" for q in plan.sub_questions) + "\n\n"
-        f"Evidence (cite each by its bracketed number below):\n{_format_evidence_list(selected, sources_by_id)}\n"
+        f"Evidence (cite each by its bracketed number below):\n{_format_evidence_list(selected, sources_by_id)}\n\n"
+        "Figures already generated for this report — place at most one reference to "
+        "each, on its own line, exactly as `![caption](figure://{id})`, only where it "
+        "genuinely helps (not one per figure just because it exists), and only using "
+        f"the ids listed here:\n{_format_figures_list(figures)}\n"
     )
 
     retry_feedback = _format_retry_feedback(state)
@@ -182,7 +215,9 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
         ctx.events.report_chunk(delta)
     response = stream.response
 
-    sections = [_strip_model_appended_sections(response.content)]
+    body = _strip_model_appended_sections(response.content)
+    body = _strip_invalid_figure_refs(body, {fig.id for fig in figures})
+    sections = [body]
     contradictions_section = _build_contradictions_section(contradictions, evidence_by_id)
     if contradictions_section:
         sections.append(contradictions_section)

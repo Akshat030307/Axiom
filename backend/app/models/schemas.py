@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 SourceType = Literal["web", "academic", "data"]
 ResearchMode = Literal["quick", "deep", "academic", "competitive"]
@@ -77,6 +77,46 @@ class Figure(BaseModel):
     evidence_ids: list[str]
     source_id: str | None = None
     license_note: str | None = None
+
+
+# kind is constrained to "chart" only (rather than the full Figure.kind
+# Literal) because this build skips image_harvester and diagram_generator
+# entirely — OpenAI's strict structured-output mode then makes it
+# *impossible* for figure_planner to request anything this codebase can't
+# actually produce, rather than relying on a prompt instruction alone.
+class FigureRequest(BaseModel):
+    kind: Literal["chart"]
+    intent: str
+    evidence_ids: list[str]
+    caption: str
+
+
+class ChartSeries(BaseModel):
+    name: str
+    values: list[float]
+
+
+# PRD §11.1 — the LLM emits this, never plotting code; figures/chart_renderer.py
+# renders it with matplotlib. Value-provenance (every number traces to a real
+# Evidence.numeric_value) is enforced by chart_generator.py, not here — this
+# model only validates internal shape consistency.
+class ChartSpec(BaseModel):
+    chart_type: Literal["bar", "grouped_bar", "line", "stacked_area", "scatter", "pie", "horizontal_bar"]
+    title: str
+    x_label: str | None = None
+    y_label: str | None = None
+    unit: str | None = None
+    series: list[ChartSeries]
+    categories: list[str]
+    source_note: str
+    evidence_ids: list[str]
+
+    @model_validator(mode="after")
+    def lengths_match(self) -> "ChartSpec":
+        for s in self.series:
+            if len(s.values) != len(self.categories):
+                raise ValueError("series length must equal categories length")
+        return self
 
 
 class Citation(BaseModel):

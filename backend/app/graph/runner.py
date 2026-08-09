@@ -10,6 +10,8 @@ from app.graph.graph_builder import build_graph
 from app.graph.run_context import RunContext
 from app.llm.provider import LLMProvider
 from app.models.db_models import NodeTrace, ResearchRun
+from app.observability.events import RunEvents, run_event_bus
+from app.observability.tracer import publish_final_stat
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,10 @@ async def execute_research_run(run_id: uuid.UUID, user_id: uuid.UUID, query: str
         run.status = "running"
         await db.commit()
 
-        ctx = RunContext(db=db, run_id=run_id, llm=LLMProvider())
+        events = RunEvents(run_event_bus, str(run_id), run.started_at)
+        events.understanding_query()
+
+        ctx = RunContext(db=db, run_id=run_id, llm=LLMProvider(), events=events)
         graph = build_graph(ctx, get_checkpointer())
 
         initial_state = {
@@ -50,7 +55,7 @@ async def execute_research_run(run_id: uuid.UUID, user_id: uuid.UUID, query: str
 
         try:
             await graph.ainvoke(initial_state, config={"configurable": {"thread_id": str(run_id)}})
-        except Exception:
+        except Exception as exc:
             logger.exception("execute_research_run: run %s failed", run_id)
             await db.rollback()
             failed_run = await db.get(ResearchRun, run_id)
@@ -58,9 +63,17 @@ async def execute_research_run(run_id: uuid.UUID, user_id: uuid.UUID, query: str
                 failed_run.status = "error"
                 failed_run.completed_at = datetime.now(timezone.utc)
                 await db.commit()
+            # No node in this graph distinguishes a recoverable failure from a
+            # fatal one today (a bad domain, a failed search, etc. are caught
+            # inside the node and appended to `errors` without raising) — only
+            # truly fatal exceptions (including CostCeilingExceeded) reach
+            # here, so recoverable is always False.
+            events.error(message=str(exc), recoverable=False)
             return
 
         await _finalize_run(db, run_id)
+        await publish_final_stat(ctx)
+        events.done(report_url=f"/api/v1/research/{run_id}/report")
 
 
 async def _finalize_run(db, run_id: uuid.UUID) -> None:

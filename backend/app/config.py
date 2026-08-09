@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     MAX_IMAGE_BYTES: int = 5_242_880
     RUN_TIMEOUT_SECONDS: int = 900
     TOOL_TIMEOUT_SECONDS: int = 30
+    # Trimmed dataset (5 quick-mode questions, eval/dataset/questions.jsonl)
+    # is budgeted well under $2; the full 12-question set (questions_full.jsonl,
+    # mixed quick/deep/academic/competitive) is not what this ceiling is sized for.
+    MAX_EVAL_COST_USD: float = 1.50
+
+    # WebSocket (Phase 3 §7.3) — no Redis Pub/Sub bridge (see app/observability/events.py's
+    # module docstring for why that's safe only while the graph runs in-process).
+    WS_IDLE_TIMEOUT_SECONDS: int = 60
 
     # Retrieval tuning
     DEDUPE_THRESHOLD: float = 0.92  # reserved for the not-yet-built dedupe node

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, AsyncIterator, TypeVar
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -53,6 +53,75 @@ class EmbedResponse:
     model: str
 
 
+class LLMStream:
+    """Async iterator over content deltas from a streaming chat completion
+    (`LLMProvider.generate_stream`). Each `__anext__` returns the next
+    non-empty text delta. Once the underlying stream is exhausted, `.response`
+    is populated with an `LLMResponse` shaped exactly like `generate()`'s
+    return value, so a caller that needs the full text/usage after streaming
+    doesn't have to reassemble it by hand — mirrors the accumulate-then-use
+    pattern OpenAI's own streaming helpers use.
+
+    Requires `stream_options={"include_usage": True}` on the underlying call
+    (set by `generate_stream`) — without it, OpenAI's streaming API returns no
+    token usage at all, and the tracer's cost accounting would silently zero
+    out every streamed call."""
+
+    def __init__(self, chunks: AsyncIterator[Any], model: str, max_completion_tokens: int):
+        self._chunks = chunks
+        self._model = model
+        self._max_completion_tokens = max_completion_tokens
+        self._buffer: list[str] = []
+        self._input_tokens = 0
+        self._output_tokens = 0
+        self._finish_reason: str | None = None
+        self.response: LLMResponse | None = None
+
+    def __aiter__(self) -> "LLMStream":
+        return self
+
+    async def __anext__(self) -> str:
+        while True:
+            try:
+                chunk = await self._chunks.__anext__()
+            except StopAsyncIteration:
+                self._finalize()
+                raise
+
+            # The include_usage final chunk carries usage but an empty
+            # `choices` array — a different shape from every other chunk.
+            if chunk.usage is not None:
+                self._input_tokens = chunk.usage.prompt_tokens
+                self._output_tokens = chunk.usage.completion_tokens
+            if not chunk.choices:
+                continue
+
+            choice = chunk.choices[0]
+            if choice.finish_reason is not None:
+                self._finish_reason = choice.finish_reason
+            delta = choice.delta.content
+            if delta:
+                self._buffer.append(delta)
+                return delta
+            # empty delta (e.g. the role-only first chunk) — keep pulling
+
+    def _finalize(self) -> None:
+        content = "".join(self._buffer)
+        if self._finish_reason == "length":
+            # Same discard-on-truncation contract as generate() — see
+            # LLMTruncatedError's docstring. Chunks already streamed to any
+            # WS subscriber can't be un-sent, but the node's own return value
+            # (and therefore the persisted report) never gets the truncated
+            # content.
+            raise LLMTruncatedError(self._model, self._max_completion_tokens, self._output_tokens)
+        self.response = LLMResponse(
+            content=content,
+            input_tokens=self._input_tokens,
+            output_tokens=self._output_tokens,
+            model=self._model,
+        )
+
+
 class LLMProvider:
     """Provider-agnostic LLM interface (PRD §13) — no OpenAI-specific type may
     leak into graph/nodes/*. Model selection, reasoning-effort, and the
@@ -94,6 +163,22 @@ class LLMProvider:
             output_tokens=output_tokens,
             model=choice.model,
         )
+
+    async def generate_stream(self, task: str, *, system: str | None = None, user: str) -> LLMStream:
+        """Streaming counterpart to `generate()` — used only by synthesizer
+        today, so the report can emit `report_chunk` WS frames as tokens
+        arrive instead of after one blocking call. No streaming variant of
+        `generate_structured` exists; forced-JSON schema calls aren't
+        rendered token-by-token in the UI, so there's no reason to stream them."""
+        choice = resolve(task, self._settings)
+        stream = await self._client.chat.completions.create(
+            model=choice.model,
+            messages=self._build_messages(system, user),
+            stream=True,
+            stream_options={"include_usage": True},
+            **self._extra_kwargs(choice),
+        )
+        return LLMStream(stream, model=choice.model, max_completion_tokens=choice.max_completion_tokens)
 
     async def generate_structured(
         self, task: str, *, system: str | None = None, user: str, schema: type[T]

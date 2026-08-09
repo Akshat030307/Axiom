@@ -110,7 +110,20 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
         f"Evidence (cite each by its bracketed number below):\n{_format_evidence_list(selected, sources_by_id)}\n"
     )
 
-    response = await ctx.llm.generate("synthesis", system=SYSTEM_PROMPT, user=user_prompt)
+    # Streams report_chunk frames as tokens arrive (design streams the report
+    # as it writes) rather than one blocking call. The post-processing below
+    # — stripping a spurious model-authored Sources heading, appending the
+    # programmatic Sources/Contradictions sections — runs on the fully
+    # accumulated text after the stream ends, same as it always did on
+    # generate()'s return value. That means a client's live-accumulated
+    # report_chunk text can transiently include a few tokens that get
+    # stripped server-side before persistence; accepted as a documented
+    # cosmetic gap for this phase (frontend should re-fetch the canonical
+    # report on `done` rather than trusting accumulated chunks).
+    stream = await ctx.llm.generate_stream("synthesis", system=SYSTEM_PROMPT, user=user_prompt)
+    async for delta in stream:
+        ctx.events.report_chunk(delta)
+    response = stream.response
 
     sections = [_strip_model_appended_sections(response.content)]
     contradictions_section = _build_contradictions_section(contradictions, evidence_by_id)

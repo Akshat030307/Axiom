@@ -11,6 +11,7 @@ from app.config import build_pricing, get_settings
 from app.graph.run_context import NodeResult, RunContext
 from app.graph.state import ResearchState
 from app.models.db_models import NodeTrace
+from app.observability.stat import compute_run_stat_counts
 
 settings = get_settings()
 PRICING = build_pricing(settings)
@@ -50,6 +51,18 @@ async def _run_cost_so_far(ctx: RunContext) -> float:
     return float(total or 0)
 
 
+async def _publish_stat(ctx: RunContext, *, force: bool = False) -> None:
+    """Cheap COUNT-aggregate batch, scoped to run_id, published as a `stat`
+    frame (PRD §7.3) — throttled inside RunEvents.stat() to at most once
+    every STAT_MIN_INTERVAL_SECONDS regardless of how often this is called."""
+    counts = await compute_run_stat_counts(ctx.db, ctx.run_id)
+    ctx.events.stat(
+        **counts,
+        eta_seconds=ctx.events.estimate_eta_seconds(),
+        force=force,
+    )
+
+
 def traced(node_name: str) -> Callable[[NodeFn], Callable[[ResearchState, RunContext], Awaitable[dict]]]:
     """Wraps a node's business logic (state, ctx) -> NodeResult. Handles:
     - cost-ceiling enforcement before the node runs (Correction #12 — must not
@@ -82,7 +95,15 @@ def traced(node_name: str) -> Callable[[NodeFn], Callable[[ResearchState, RunCon
                 )
                 ctx.db.add(trace)
                 await ctx.db.commit()
+                # PRD §13/§21 Definition of Done: a run over MAX_RUN_COST_USD
+                # aborts cleanly with an `error` frame, recoverable: false.
+                ctx.events.error(
+                    message=f"MAX_RUN_COST_USD ({settings.MAX_RUN_COST_USD}) exceeded before node {node_name} ran",
+                    recoverable=False,
+                )
                 raise CostCeilingExceeded(f"run {ctx.run_id} exceeded MAX_RUN_COST_USD before node {node_name}")
+
+            ctx.events.node_started(node_name)
 
             status = "ok"
             error_text: str | None = None
@@ -120,7 +141,17 @@ def traced(node_name: str) -> Callable[[NodeFn], Callable[[ResearchState, RunCon
                     )
                 )
                 await ctx.db.commit()
+                if status == "ok":
+                    ctx.events.node_finished(node_name, latency_ms=latency_ms, cost_usd=float(cost or 0))
+                    await _publish_stat(ctx)
 
         return wrapper
 
     return decorator
+
+
+async def publish_final_stat(ctx: RunContext) -> None:
+    """Called once by runner.py right before the `done` frame, bypassing the
+    stat throttle so the last thing the client sees before completion is an
+    accurate final count, not a stale throttled one."""
+    await _publish_stat(ctx, force=True)

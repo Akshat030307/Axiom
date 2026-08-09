@@ -5,8 +5,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes_auth import router as auth_router
+from app.api.routes_eval import router as eval_router
+from app.api.routes_evidence import router as evidence_router
 from app.api.routes_reports import router as reports_router
 from app.api.routes_research import router as research_router
+from app.api.routes_sources import router as sources_router
+from app.api.routes_trace import router as trace_router
+from app.api.ws import router as ws_router
 from app.config import get_settings
 from app.graph.checkpointer import close_checkpointer, init_checkpointer
 
@@ -34,6 +39,11 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(research_router)
 app.include_router(reports_router)
+app.include_router(sources_router)
+app.include_router(evidence_router)
+app.include_router(trace_router)
+app.include_router(eval_router)
+app.include_router(ws_router)
 
 
 @app.get("/health")

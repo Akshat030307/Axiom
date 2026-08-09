@@ -66,17 +66,30 @@ async def web_researcher_node(state: ResearchState, ctx: RunContext) -> NodeResu
 
             seen_urls.add(url)
             source_id = uuid.uuid4()
+            title = result.get("title") or url
+            domain = urlparse(url).netloc
             ctx.db.add(
                 Source(
                     id=source_id,
                     run_id=ctx.run_id,
                     url=url,
-                    title=result.get("title") or url,
-                    domain=urlparse(url).netloc,
+                    title=title,
+                    domain=domain,
                     source_type="web",
                     publication_date=result.get("published_date"),
                     credibility_score=DEFAULT_CREDIBILITY,
                 )
+            )
+            # Credibility here is still the placeholder (credibility_scorer
+            # hasn't run yet) — the WS client sees the real score later via
+            # the `stat`/REST paths once scoring completes; this event is
+            # about "a source was found", not the final score.
+            ctx.events.source_found(
+                source_id=str(source_id),
+                title=title,
+                domain=domain,
+                source_type="web",
+                credibility_score=DEFAULT_CREDIBILITY,
             )
 
             raw_findings.append(

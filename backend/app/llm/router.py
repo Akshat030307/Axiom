@@ -29,6 +29,9 @@ ROUTES: dict[str, Route] = {
     "fact_check_verification": Route(tier="fast", effort_field="EFFORT_VERIFICATION", max_completion_tokens=800),
     "classification": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=1000),
     "contradiction_resolution": Route(tier="reasoning", effort_field="EFFORT_CONTRADICTION", max_completion_tokens=1500),
+    # Phase 3 eval — one batched call per report (§17 citation_accuracy), not
+    # a call per citation, so a report with dozens of markers stays cheap.
+    "citation_judgment": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=2000),
 }
 
 

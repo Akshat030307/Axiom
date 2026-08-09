@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_owned_run
@@ -53,6 +54,13 @@ class RunStatusResponse(BaseModel):
         )
 
 
+class RunHistoryResponse(BaseModel):
+    items: list[RunStatusResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 @router.post("", response_model=CreateRunResponse, status_code=status.HTTP_201_CREATED)
 async def create_research(
     body: CreateRunRequest,
@@ -68,6 +76,29 @@ async def create_research(
     # app/graph/runner.py's docstring for why it opens its own.
     background_tasks.add_task(execute_research_run, run_id, user.id, body.query, body.mode)
     return CreateRunResponse(run_id=run_id)
+
+
+@router.get("", response_model=RunHistoryResponse)
+async def list_research_history(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> RunHistoryResponse:
+    total = await db.scalar(select(func.count(ResearchRun.id)).where(ResearchRun.user_id == user.id))
+    rows = (
+        await db.scalars(
+            select(ResearchRun)
+            .where(ResearchRun.user_id == user.id)
+            # Matches the existing (user_id, started_at DESC) index (§6).
+            .order_by(ResearchRun.started_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    return RunHistoryResponse(
+        items=[RunStatusResponse.from_run(r) for r in rows], total=int(total or 0), limit=limit, offset=offset
+    )
 
 
 @router.get("/{run_id}", response_model=RunStatusResponse)

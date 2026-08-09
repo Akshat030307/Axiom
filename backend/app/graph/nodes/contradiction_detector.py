@@ -287,6 +287,11 @@ async def contradiction_detector_node(state: ResearchState, ctx: RunContext) -> 
                 resolved=outcome.contradiction.resolved,
             )
         )
+        ctx.events.contradiction_found(
+            topic=outcome.contradiction.topic,
+            evidence_a_id=outcome.contradiction.evidence_a_id,
+            evidence_b_id=outcome.contradiction.evidence_b_id,
+        )
 
     return NodeResult(
         state_update={"contradictions": contradictions},

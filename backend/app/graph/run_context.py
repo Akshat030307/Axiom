@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.provider import LLMProvider
+from app.observability.events import RunEvents
 
 
 @dataclass
@@ -19,11 +20,16 @@ class RunContext:
     no concurrent-access hazard). It must never be a request-scoped session —
     that one is closed the moment the HTTP response is sent, before the graph
     has done any work.
+
+    `events` is the run's handle onto the process-wide WS event bus (Phase 3
+    §7.3, app/observability/events.py) — nodes call `ctx.events.source_found(...)`
+    etc. directly rather than going through a separate worker/broker.
     """
 
     db: AsyncSession
     run_id: uuid.UUID
     llm: LLMProvider
+    events: RunEvents
     _seq: itertools.count = field(default_factory=lambda: itertools.count(1))
 
     def next_seq(self) -> int:

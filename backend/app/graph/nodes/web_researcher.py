@@ -8,8 +8,8 @@ from app.guardrails.sanitize import sanitize_text, wrap_fetched_content
 from app.models.db_models import Source
 from app.observability.tracer import traced
 from app.retrieval.chunking import select_relevant_chunks
+from app.tools import academic_search, web_search
 from app.tools.web_fetch import fetch_clean_text
-from app.tools.web_search import search
 
 settings = get_settings()
 
@@ -33,13 +33,20 @@ async def web_researcher_node(state: ResearchState, ctx: RunContext) -> NodeResu
     seen_urls: set[str] = set()
     tool_calls_used = 0
 
+    # Academic mode searches OpenAlex instead of general web search — same
+    # {url, title, content, published_date} result shape (see
+    # tools/academic_search.py), so the rest of this loop is untouched.
+    is_academic = state["mode"] == "academic"
+    search_fn = academic_search.search if is_academic else web_search.search
+    source_type = "academic" if is_academic else "web"
+
     for sub_question_index, sub_question in enumerate(plan.sub_questions):
         if tool_calls_used >= settings.MAX_TOOL_CALLS_PER_NODE:
             errors.append("web_researcher: MAX_TOOL_CALLS_PER_NODE reached, remaining sub-questions skipped")
             break
 
         try:
-            results = await search(sub_question, max_results=RESULTS_PER_SUBQUESTION)
+            results = await search_fn(sub_question, max_results=RESULTS_PER_SUBQUESTION)
         except Exception as exc:
             errors.append(f"web_researcher: search failed for '{sub_question}': {exc}")
             tool_calls_used += 1
@@ -75,7 +82,7 @@ async def web_researcher_node(state: ResearchState, ctx: RunContext) -> NodeResu
                     url=url,
                     title=title,
                     domain=domain,
-                    source_type="web",
+                    source_type=source_type,
                     publication_date=result.get("published_date"),
                     credibility_score=DEFAULT_CREDIBILITY,
                 )
@@ -88,7 +95,7 @@ async def web_researcher_node(state: ResearchState, ctx: RunContext) -> NodeResu
                 source_id=str(source_id),
                 title=title,
                 domain=domain,
-                source_type="web",
+                source_type=source_type,
                 credibility_score=DEFAULT_CREDIBILITY,
             )
 

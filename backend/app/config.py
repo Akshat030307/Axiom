@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     SEARCH_API_KEY: str
     SEMANTIC_SCHOLAR_API_KEY: str = ""
+    OPENALEX_API_KEY: str = ""
 
     # Models
     OPENAI_MODEL_REASONING: str
@@ -43,6 +44,18 @@ class Settings(BaseSettings):
     MAX_FACT_CHECKS_DEEP: int = 40
     MAX_FIGURES_PER_REPORT: int = 6
     MAX_CITATION_RETRIES: int = 2
+    # Illustrations cost per-image (flat, not token-based — see NodeResult.
+    # cost_override in image_generator.py) and are unverifiable by design (no
+    # equivalent to chart_generator's value-grounding check exists for
+    # generated pixels), so the cap is deliberately much lower than
+    # MAX_FIGURES_PER_REPORT. gpt-image-1-mini at "low" quality prices at
+    # ~$0.005/image — raising OPENAI_IMAGE_MODEL/IMAGE_QUALITY without also
+    # updating IMAGE_COST_PER_IMAGE_USD will under-report real spend to the
+    # cost ceiling.
+    OPENAI_IMAGE_MODEL: str = "gpt-image-1-mini"
+    IMAGE_QUALITY: str = "low"
+    IMAGE_COST_PER_IMAGE_USD: float = 0.005
+    MAX_ILLUSTRATIONS_PER_REPORT: int = 2
     MAX_IMAGE_BYTES: int = 5_242_880
     RUN_TIMEOUT_SECONDS: int = 900
     TOOL_TIMEOUT_SECONDS: int = 30

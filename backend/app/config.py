@@ -11,11 +11,26 @@ class Settings(BaseSettings):
     SEARCH_API_KEY: str
     SEMANTIC_SCHOLAR_API_KEY: str = ""
     OPENALEX_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
 
     # Models
     OPENAI_MODEL_REASONING: str
     OPENAI_MODEL_FAST: str
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    # "openai" (default) or "groq" — switches every reasoning-tier task
+    # (planning, synthesis, figure/illustration planning, contradiction
+    # resolution) to Groq's hosted inference. Fast-tier tasks and embeddings
+    # are unaffected regardless of this setting — Groq has no embedding API,
+    # and the fast tier's tasks weren't the expensive ones this was meant to
+    # address. Has no effect if GROQ_API_KEY is empty (see LLMProvider).
+    REASONING_PROVIDER: str = "openai"
+    # gpt-oss-120b specifically, not "any Groq model" — it's OpenAI's own
+    # open-weight reasoning model (so the existing reasoning_effort plumbing
+    # applies unchanged) and one of only two Groq-hosted models that support
+    # the full low/medium/high range this codebase already passes; most
+    # other Groq models only accept none/default and would 400 otherwise.
+    GROQ_MODEL_REASONING: str = "openai/gpt-oss-120b"
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
     EMBEDDING_DIM: int = 1536
     SEARCH_PROVIDER: str = "tavily"
 
@@ -124,5 +139,11 @@ def build_pricing(settings: Settings) -> dict[str, dict[str, float]]:
         settings.OPENAI_EMBEDDING_MODEL: {
             "input": 0.02 / 1_000_000,
             "output": 0.0,
+        },
+        # Groq-hosted gpt-oss-120b — real published rate, not estimated like
+        # the OpenAI entries above (Groq's pricing page is public per-model).
+        settings.GROQ_MODEL_REASONING: {
+            "input": 0.15 / 1_000_000,
+            "output": 0.60 / 1_000_000,
         },
     }

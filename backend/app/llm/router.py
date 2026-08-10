@@ -4,6 +4,7 @@ from typing import Literal
 from app.config import Settings
 
 Tier = Literal["reasoning", "fast"]
+Provider = Literal["openai", "groq"]
 
 
 @dataclass(frozen=True)
@@ -58,15 +59,31 @@ class ModelChoice:
     tier: Tier
     reasoning_effort: str | None  # None means: do not pass reasoning_effort at all
     max_completion_tokens: int
+    provider: Provider = "openai"
 
 
 def resolve(task: str, settings: Settings) -> ModelChoice:
     route = ROUTES[task]
-    model = settings.OPENAI_MODEL_REASONING if route.tier == "reasoning" else settings.OPENAI_MODEL_FAST
     effort = getattr(settings, route.effort_field)
+
+    # Fast-tier tasks and embeddings are unaffected by REASONING_PROVIDER —
+    # only the reasoning tier is what Groq was evaluated for (see
+    # PARALLELIZATION_PLAN.md's cost discussion). A Groq call still needs a
+    # real key; falling back to OpenAI here (rather than raising) means
+    # flipping REASONING_PROVIDER back to "openai" is never required just
+    # because a key hasn't been added yet.
+    use_groq = route.tier == "reasoning" and settings.REASONING_PROVIDER == "groq" and bool(settings.GROQ_API_KEY)
+    if use_groq:
+        model = settings.GROQ_MODEL_REASONING
+        provider: Provider = "groq"
+    else:
+        model = settings.OPENAI_MODEL_REASONING if route.tier == "reasoning" else settings.OPENAI_MODEL_FAST
+        provider = "openai"
+
     return ModelChoice(
         model=model,
         tier=route.tier,
         reasoning_effort=None if effort == "none" else effort,
         max_completion_tokens=route.max_completion_tokens,
+        provider=provider,
     )

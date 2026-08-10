@@ -1,4 +1,5 @@
 import base64
+import logging
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, TypeVar
 
@@ -9,6 +10,7 @@ from app.config import Settings, get_settings
 from app.llm.router import ModelChoice, resolve
 
 T = TypeVar("T", bound=BaseModel)
+logger = logging.getLogger(__name__)
 
 
 class LLMTruncatedError(RuntimeError):
@@ -132,6 +134,15 @@ class LLMProvider:
     def __init__(self, settings: Settings | None = None):
         self._settings = settings or get_settings()
         self._client = AsyncOpenAI(api_key=self._settings.OPENAI_API_KEY)
+        # Only constructed when a key is present — router.resolve() already
+        # never returns provider="groq" without one, but _client_for's guard
+        # below is what makes that a defensive invariant rather than an
+        # assumption baked in twice.
+        self._groq_client = (
+            AsyncOpenAI(base_url=self._settings.GROQ_BASE_URL, api_key=self._settings.GROQ_API_KEY)
+            if self._settings.GROQ_API_KEY
+            else None
+        )
 
     def _build_messages(self, system: str | None, user: str) -> list[dict[str, str]]:
         messages = []
@@ -146,13 +157,46 @@ class LLMProvider:
             kwargs["reasoning_effort"] = choice.reasoning_effort
         return kwargs
 
+    def _client_for(self, choice: ModelChoice) -> AsyncOpenAI:
+        if choice.provider == "groq":
+            if self._groq_client is None:
+                raise RuntimeError("ModelChoice.provider is 'groq' but GROQ_API_KEY is not set")
+            return self._groq_client
+        return self._client
+
+    def _openai_fallback(self, choice: ModelChoice) -> ModelChoice:
+        """Groq's free tier in particular has a tight per-minute token cap
+        (see PARALLELIZATION_PLAN.md-adjacent cost discussion) — a 429 mid-run
+        should degrade to the OpenAI reasoning-tier model for that one call,
+        not fail the run. reasoning_effort/max_completion_tokens carry over
+        unchanged since gpt-oss-120b and OpenAI's reasoning tier accept the
+        same low/medium/high/none values."""
+        return ModelChoice(
+            model=self._settings.OPENAI_MODEL_REASONING,
+            tier=choice.tier,
+            reasoning_effort=choice.reasoning_effort,
+            max_completion_tokens=choice.max_completion_tokens,
+            provider="openai",
+        )
+
     async def generate(self, task: str, *, system: str | None = None, user: str) -> LLMResponse:
         choice = resolve(task, self._settings)
-        completion = await self._client.chat.completions.create(
-            model=choice.model,
-            messages=self._build_messages(system, user),
-            **self._extra_kwargs(choice),
-        )
+        try:
+            completion = await self._client_for(choice).chat.completions.create(
+                model=choice.model,
+                messages=self._build_messages(system, user),
+                **self._extra_kwargs(choice),
+            )
+        except Exception as exc:
+            if choice.provider != "groq":
+                raise
+            logger.warning("generate[%s]: Groq call failed (%s), falling back to OpenAI", task, exc)
+            choice = self._openai_fallback(choice)
+            completion = await self._client.chat.completions.create(
+                model=choice.model,
+                messages=self._build_messages(system, user),
+                **self._extra_kwargs(choice),
+            )
         finish_reason = completion.choices[0].finish_reason
         usage = completion.usage
         output_tokens = usage.completion_tokens if usage else 0
@@ -172,25 +216,50 @@ class LLMProvider:
         `generate_structured` exists; forced-JSON schema calls aren't
         rendered token-by-token in the UI, so there's no reason to stream them."""
         choice = resolve(task, self._settings)
-        stream = await self._client.chat.completions.create(
-            model=choice.model,
-            messages=self._build_messages(system, user),
-            stream=True,
-            stream_options={"include_usage": True},
-            **self._extra_kwargs(choice),
-        )
+        try:
+            stream = await self._client_for(choice).chat.completions.create(
+                model=choice.model,
+                messages=self._build_messages(system, user),
+                stream=True,
+                stream_options={"include_usage": True},
+                **self._extra_kwargs(choice),
+            )
+        except Exception as exc:
+            if choice.provider != "groq":
+                raise
+            logger.warning("generate_stream[%s]: Groq call failed (%s), falling back to OpenAI", task, exc)
+            choice = self._openai_fallback(choice)
+            stream = await self._client.chat.completions.create(
+                model=choice.model,
+                messages=self._build_messages(system, user),
+                stream=True,
+                stream_options={"include_usage": True},
+                **self._extra_kwargs(choice),
+            )
         return LLMStream(stream, model=choice.model, max_completion_tokens=choice.max_completion_tokens)
 
     async def generate_structured(
         self, task: str, *, system: str | None = None, user: str, schema: type[T]
     ) -> LLMStructuredResponse:
         choice = resolve(task, self._settings)
-        completion = await self._client.chat.completions.parse(
-            model=choice.model,
-            messages=self._build_messages(system, user),
-            response_format=schema,
-            **self._extra_kwargs(choice),
-        )
+        try:
+            completion = await self._client_for(choice).chat.completions.parse(
+                model=choice.model,
+                messages=self._build_messages(system, user),
+                response_format=schema,
+                **self._extra_kwargs(choice),
+            )
+        except Exception as exc:
+            if choice.provider != "groq":
+                raise
+            logger.warning("generate_structured[%s]: Groq call failed (%s), falling back to OpenAI", task, exc)
+            choice = self._openai_fallback(choice)
+            completion = await self._client.chat.completions.parse(
+                model=choice.model,
+                messages=self._build_messages(system, user),
+                response_format=schema,
+                **self._extra_kwargs(choice),
+            )
         finish_reason = completion.choices[0].finish_reason
         usage = completion.usage
         output_tokens = usage.completion_tokens if usage else 0

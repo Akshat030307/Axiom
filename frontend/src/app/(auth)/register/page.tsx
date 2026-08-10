@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { Logo } from "@/components/shell/Logo";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function RegisterPage() {
@@ -31,6 +32,15 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <Logo size={40} />
+        <div>
+          <p className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-[-0.02em] text-fg">
+            Axiom
+          </p>
+          <p className="text-sm text-fg-muted">Research, without the noise.</p>
+        </div>
+      </div>
       <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-[-0.02em] text-fg">
         Create an account
       </h1>

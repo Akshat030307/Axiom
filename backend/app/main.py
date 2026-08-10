@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     await close_checkpointer()
 
 
-app = FastAPI(title="Research Agent API", lifespan=lifespan)
+app = FastAPI(title="Axiom API", description="Research, without the noise.", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

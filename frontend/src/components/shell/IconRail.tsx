@@ -36,9 +36,11 @@ export function IconRail() {
 
   return (
     <nav className="fixed inset-y-0 left-0 z-40 flex w-[110px] flex-col items-center gap-8 border-r border-border bg-black py-7">
-      <Link href="/" aria-label="Research Agent home">
-        <Logo size={34} />
-      </Link>
+      <Tooltip label="Axiom — Research, without the noise.">
+        <Link href="/" aria-label="Axiom home">
+          <Logo size={34} />
+        </Link>
+      </Tooltip>
 
       <ul className="flex flex-col items-center gap-2">
         {NAV_ITEMS.map(({ href, label, icon: Icon, match }) => {

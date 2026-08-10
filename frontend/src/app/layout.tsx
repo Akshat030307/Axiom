@@ -10,8 +10,8 @@ const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-int
 const interTight = Inter_Tight({ subsets: ["latin"], display: "swap", variable: "--font-inter-tight" });
 
 export const metadata: Metadata = {
-  title: "Research Agent",
-  description: "Autonomous research agent",
+  title: "Axiom",
+  description: "Research, without the noise.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

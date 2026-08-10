@@ -67,7 +67,7 @@ export function Logo({ size = 32, strokeWidth = 1.5, className }: LogoProps) {
       strokeWidth={strokeWidth}
       strokeLinejoin="round"
       role="img"
-      aria-label="Research Agent"
+      aria-label="Axiom"
     >
       {RAYS.map((d, i) => (
         <path key={i} d={d} />

@@ -1,4 +1,6 @@
-# Research Agent
+# Axiom
+
+*Research, without the noise.*
 
 An autonomous research agent: give it a question, it plans sub-questions,
 searches the web, extracts and fact-checks evidence, resolves contradictions,

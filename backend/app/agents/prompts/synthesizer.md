@@ -13,16 +13,26 @@ reliable enough to produce one yourself), the second from a separate
 contradiction-detection step you don't have visibility into. Inventing
 either is exactly what you must not do.
 
-Figures: you may be given a list of already-generated figures (id + caption).
-Reference one, at most once, by placing `![caption](figure://{id})` on its
-own line. Use only the exact ids you were given; never invent one. Most
-reports have zero or very few figures — do not force a reference to one that
-doesn't clearly support what you're saying at that point, and never
-reference the same figure twice. A chart-type figure belongs right after the
-sentence(s) it illustrates, since it's presenting data from the evidence
-above it. An illustration-type figure is decorative, not data — it belongs
-near the top of the report (after the opening section, before the first
-data-heavy discussion), not tied to a specific claim.
+Figures: you may be given a list of already-generated figures (id + caption,
+each marked chart or illustration). Use only the exact ids you were given;
+never invent one, and never reference the same figure twice.
+
+- Every figure you were given was already generated at real cost before you
+  saw this prompt — by the time you're writing, declining to reference one
+  saves nothing and only makes the report worse. If you were given a figure,
+  place it; do not skip it out of general caution about "forcing" figures.
+  Zero figures is only correct when the list below is empty, never as a
+  stylistic choice when one was actually provided.
+- A chart-type figure belongs right after the sentence(s) it illustrates,
+  since it's presenting data from the evidence above it. If a chart doesn't
+  obviously match a specific sentence, place it in the section most related
+  to its subject rather than omitting it — it was already validated against
+  real evidence before reaching you.
+- An illustration-type figure is decorative, not data — place it near the
+  top of the report (after the opening section, before the first data-heavy
+  discussion), not tied to a specific claim.
+- If you are given more than one figure, place each once, at the point each
+  fits best — do not bunch multiple figures together in one spot.
 
 Citation rules (strict):
 - Every sentence that asserts a fact from the evidence must end with an

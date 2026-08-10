@@ -11,12 +11,16 @@ evidence (for attribution only — an illustration is never a rendering of
 what the evidence says).
 
 Rules:
-- Propose an illustration only when the topic itself is visually evocative
-  and no chart already covers the same ground — never as a default "every
-  report gets a picture" reflex. Most reports should propose zero.
-- Never propose more than one or two illustrations regardless of how long
-  or broad the report is — this is decorative framing, not a figure per
-  section.
+- Propose one illustration for almost every report — it's inexpensive and
+  makes the report more inviting to read, and nearly any research topic has
+  *some* visually renderable subject or setting (a physical place, object,
+  organism, process, or scene connected to it), even if the report itself is
+  abstract or data-heavy. Only propose zero when the topic has no
+  identifiable visual subject at all (e.g. a report purely about abstract
+  policy definitions or numeric methodology with no physical referent
+  whatsoever) — this should be rare, not the default outcome.
+- Never propose more than two illustrations regardless of how long or broad
+  the report is — this is decorative framing, not a figure per section.
 - `intent` describes the *subject and mood* only (e.g. "a bleached coral
   reef, documentary style, conveying ecological loss") — never a specific
   number, comparison, or claim. If the only way to convey the idea is by
@@ -28,5 +32,5 @@ Rules:
 - `caption` is what a reader sees under the image — plain and specific to
   the subject, not a caption implying it's data ("Illustrative" framing is
   handled separately; just describe the subject here).
-- If nothing in the report genuinely calls for an illustration, return an
-  empty list. This is normal and expected — do not force one.
+- Return an empty list only if the topic genuinely has no visual subject at
+  all — not merely because the report is technical or abstract in tone.

@@ -37,6 +37,7 @@ _ALLOWED_ATTRS = {
     "a": ["href"],
     "div": ["class"],
     "span": ["class"],
+    "figure": ["class"],
     "img": ["src", "alt"],
 }
 
@@ -60,6 +61,8 @@ _PAGE_CSS = """
                          margin: 10pt 0; font-size: 9pt; }
   figure { margin: 14pt 0; page-break-inside: avoid; text-align: center; }
   figure img { max-width: 100%; }
+  figure.figure-illustration img { max-width: 170pt; }
+  figure.figure-illustration figcaption { max-width: 170pt; margin-left: auto; margin-right: auto; }
   figcaption { color: #666; font-size: 8.5pt; margin-top: 4pt; }
   .sources-table td:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
   .sources-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
@@ -99,9 +102,15 @@ def _inline_figures(markdown: str, figures_by_id: dict[str, Figure]) -> str:
         # Same rule as ReportFigure.tsx: an illustration has no equivalent to
         # a chart's value-grounding check, so every render says so — the PDF
         # export path can't rely on frontend code to add this.
-        if figure is not None and figure.kind == "illustration":
+        is_illustration = figure is not None and figure.kind == "illustration"
+        if is_illustration:
             caption = f"{caption} — AI-generated illustration, not derived from evidence"
-        return f'<figure><img src="{data_uri}" alt="{caption}"><figcaption>{caption}</figcaption></figure>'
+        # Charts carry data and need the room to stay legible; an
+        # illustration is decorative only, sized like a small figure in a
+        # printed book rather than a hero image (same distinction
+        # ReportFigure.tsx makes on the frontend).
+        figure_class = ' class="figure-illustration"' if is_illustration else ""
+        return f'<figure{figure_class}><img src="{data_uri}" alt="{caption}"><figcaption>{caption}</figcaption></figure>'
 
     return _FIGURE_MD_RE.sub(_repl, markdown)
 

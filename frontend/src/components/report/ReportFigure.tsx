@@ -21,6 +21,13 @@ export function ReportFigure({ figureId, caption, kind }: ReportFigureProps) {
   const displayCaption =
     kind === "illustration" ? `${caption} — AI-generated illustration, not derived from evidence` : caption;
 
+  // Charts/diagrams carry data and need the room to stay legible — full
+  // column width. An illustration is decorative only; sized like a small
+  // figure in a printed book, not a hero image, so it doesn't compete with
+  // the report's actual content for attention.
+  const isIllustration = kind === "illustration";
+  const widthClass = isIllustration ? "w-56" : "w-full";
+
   const { accessToken } = useAuth();
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -62,13 +69,17 @@ export function ReportFigure({ figureId, caption, kind }: ReportFigureProps) {
     <figure className="my-4 flex flex-col items-center gap-2">
       {objectUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- blob: URL, not something next/image can optimize
-        <img src={objectUrl} alt={caption} className="max-w-full rounded-input border border-border" />
+        <img src={objectUrl} alt={caption} className={`max-w-full rounded-input border border-border ${widthClass}`} />
       ) : (
-        <span className="flex h-40 w-full items-center justify-center rounded-input border border-border bg-surface text-xs text-fg-subtle">
+        <span
+          className={`flex h-40 items-center justify-center rounded-input border border-border bg-surface text-xs text-fg-subtle ${widthClass}`}
+        >
           Loading figure…
         </span>
       )}
-      <figcaption className="text-center text-xs text-fg-muted">{displayCaption}</figcaption>
+      <figcaption className={`text-center text-xs text-fg-muted ${isIllustration ? "w-56" : ""}`}>
+        {displayCaption}
+      </figcaption>
     </figure>
   );
 }

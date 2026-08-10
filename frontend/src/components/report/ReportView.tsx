@@ -88,7 +88,7 @@ export function ReportView({ markdown, citations, evidenceById, figuresById }: R
                 const figureId = src.slice("figure://".length);
                 const figure = figuresById.get(figureId);
                 if (!figure) return <FigurePlaceholder alt={alt} />;
-                return <ReportFigure figureId={figure.id} caption={figure.caption} />;
+                return <ReportFigure figureId={figure.id} caption={figure.caption} kind={figure.kind} />;
               }
               // eslint-disable-next-line @next/next/no-img-element -- external report images aren't known to next/image
               return <img src={src} alt={alt ?? ""} className="my-3 max-w-full rounded-input" />;

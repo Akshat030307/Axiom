@@ -55,7 +55,7 @@ def _format_evidence_list(evidence: list[Evidence], sources_by_id: dict[str, Sou
 def _format_figures_list(figures: list[Figure]) -> str:
     if not figures:
         return "(none were generated for this report — do not reference any figure://)"
-    return "\n".join(f"- figure://{fig.id} — {fig.caption}" for fig in figures)
+    return "\n".join(f"- figure://{fig.id} ({fig.kind}) — {fig.caption}" for fig in figures)
 
 
 def _strip_invalid_figure_refs(content: str, valid_figure_ids: set[str]) -> str:

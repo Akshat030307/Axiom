@@ -8,6 +8,7 @@ from app.models.schemas import (
     FactCheckResult,
     Figure,
     FigureRequest,
+    IllustrationRequest,
     ResearchPlan,
 )
 
@@ -33,6 +34,7 @@ class ResearchState(TypedDict, total=False):
     fact_check_results: list[FactCheckResult]
     contradictions: list[Contradiction]
     figure_requests: list[FigureRequest]
+    illustration_requests: list[IllustrationRequest]
     report_markdown: str
     citations: list[Citation]
     citation_retry_count: int

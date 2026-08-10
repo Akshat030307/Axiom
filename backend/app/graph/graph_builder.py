@@ -15,6 +15,8 @@ from app.graph.nodes.credibility_scorer import credibility_scorer_node
 from app.graph.nodes.evidence_extractor import evidence_extractor_node
 from app.graph.nodes.fact_checker import fact_checker_node
 from app.graph.nodes.figure_planner import figure_planner_node
+from app.graph.nodes.illustration_planner import illustration_planner_node
+from app.graph.nodes.image_generator import image_generator_node
 from app.graph.nodes.planner import planner_node
 from app.graph.nodes.retriever import retriever_node
 from app.graph.nodes.synthesizer import synthesizer_node
@@ -52,9 +54,16 @@ def build_graph(ctx: RunContext, checkpointer: BaseCheckpointSaver) -> CompiledS
 
     figure_planner/chart_generator also run before synthesizer, for the same
     reason: the synthesizer needs the finished `figures` list (ids + captions)
-    to place `figure://{id}` markers while it writes, not after. image_harvester
-    and diagram_generator are out of scope for this build — chart_generator is
-    the only figure-producing node, matching PRD §8 minus those two.
+    to place `figure://{id}` markers while it writes, not after.
+
+    illustration_planner/image_generator run right after chart_generator, one
+    hop later in the same "before synthesizer" region — same reason, but kept
+    as a fully separate node pair (not folded into figure_planner/
+    chart_generator) because illustrations have no equivalent to
+    chart_generator's value-grounding check: there's no way to verify a
+    generated image doesn't misrepresent the evidence, so that pipeline is
+    deliberately isolated rather than sharing types/validation with the
+    chart pipeline. image_harvester and diagram_generator remain out of scope.
     """
     builder = StateGraph(ResearchState)
 
@@ -67,6 +76,8 @@ def build_graph(ctx: RunContext, checkpointer: BaseCheckpointSaver) -> CompiledS
     builder.add_node("contradiction_detector", _bind(contradiction_detector_node, ctx))
     builder.add_node("figure_planner", _bind(figure_planner_node, ctx))
     builder.add_node("chart_generator", _bind(chart_generator_node, ctx))
+    builder.add_node("illustration_planner", _bind(illustration_planner_node, ctx))
+    builder.add_node("image_generator", _bind(image_generator_node, ctx))
     builder.add_node("synthesizer", _bind(synthesizer_node, ctx))
     builder.add_node("citation_validator", _bind(citation_validator_node, ctx))
     builder.add_node("force_finalize", _bind(force_finalize_node, ctx))
@@ -80,7 +91,9 @@ def build_graph(ctx: RunContext, checkpointer: BaseCheckpointSaver) -> CompiledS
     builder.add_edge("fact_checker", "contradiction_detector")
     builder.add_edge("contradiction_detector", "figure_planner")
     builder.add_edge("figure_planner", "chart_generator")
-    builder.add_edge("chart_generator", "synthesizer")
+    builder.add_edge("chart_generator", "illustration_planner")
+    builder.add_edge("illustration_planner", "image_generator")
+    builder.add_edge("image_generator", "synthesizer")
     builder.add_edge("synthesizer", "citation_validator")
     builder.add_conditional_edges(
         "citation_validator",

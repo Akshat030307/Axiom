@@ -96,6 +96,11 @@ def _inline_figures(markdown: str, figures_by_id: dict[str, Figure]) -> str:
         data_uri = _figure_data_uri(figure) if figure else None
         if data_uri is None:
             return f'<div class="figure-placeholder">{caption} — not available in this export</div>'
+        # Same rule as ReportFigure.tsx: an illustration has no equivalent to
+        # a chart's value-grounding check, so every render says so — the PDF
+        # export path can't rely on frontend code to add this.
+        if figure is not None and figure.kind == "illustration":
+            caption = f"{caption} — AI-generated illustration, not derived from evidence"
         return f'<figure><img src="{data_uri}" alt="{caption}"><figcaption>{caption}</figcaption></figure>'
 
     return _FIGURE_MD_RE.sub(_repl, markdown)

@@ -8,12 +8,19 @@ import { useAuth } from "@/hooks/useAuth";
 interface ReportFigureProps {
   figureId: string;
   caption: string;
+  kind: string;
 }
 
 // A plain <img src="/api/.../file"> can't carry the Bearer token the route
 // requires, so the bytes are fetched authenticated and swapped in as a blob
 // URL — same pattern as ExportPdfButton's download.
-export function ReportFigure({ figureId, caption }: ReportFigureProps) {
+export function ReportFigure({ figureId, caption, kind }: ReportFigureProps) {
+  // An illustration has no equivalent to a chart's value-grounding check —
+  // it's never derived from evidence, so every render of one must say so,
+  // not just a comment at the node that generated it.
+  const displayCaption =
+    kind === "illustration" ? `${caption} — AI-generated illustration, not derived from evidence` : caption;
+
   const { accessToken } = useAuth();
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -46,7 +53,7 @@ export function ReportFigure({ figureId, caption }: ReportFigureProps) {
   if (failed) {
     return (
       <span className="my-3 flex h-28 w-full items-center justify-center rounded-input border border-dashed border-border text-xs text-fg-subtle">
-        {caption} — could not be loaded
+        {displayCaption} — could not be loaded
       </span>
     );
   }
@@ -61,7 +68,7 @@ export function ReportFigure({ figureId, caption }: ReportFigureProps) {
           Loading figure…
         </span>
       )}
-      <figcaption className="text-center text-xs text-fg-muted">{caption}</figcaption>
+      <figcaption className="text-center text-xs text-fg-muted">{displayCaption}</figcaption>
     </figure>
   );
 }

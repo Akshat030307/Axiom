@@ -68,7 +68,7 @@ class Contradiction(BaseModel):
 
 class Figure(BaseModel):
     id: str
-    kind: Literal["chart", "diagram", "source_image"]
+    kind: Literal["chart", "diagram", "source_image", "illustration"]
     caption: str
     alt_text: str
     file_path: str
@@ -88,6 +88,29 @@ class FigureRequest(BaseModel):
     kind: Literal["chart"]
     intent: str
     evidence_ids: list[str]
+    caption: str
+
+
+# Deliberately its own type, not a `kind` variant of FigureRequest: chart
+# requests validate against real Evidence.numeric_value (see ChartSpec's
+# grounding check in chart_generator.py) and illustration requests cannot —
+# there is no equivalent way to verify that a generated image doesn't
+# misrepresent the evidence. Keeping the types apart means grounding-related
+# code can keep assuming "chart" without a stray branch quietly forgetting
+# to exclude illustrations.
+class IllustrationRequest(BaseModel):
+    intent: str
+    evidence_ids: list[str]
+    caption: str
+
+
+# Structured output of the prompt-writing step (image_generator.py) — never
+# passed directly to the image model from the planner, so a second LLM call
+# can enforce the no-text/no-numbers/no-specific-claims constraint
+# (image_prompt_writer.md) that keeps an illustration from looking like a
+# data visualization.
+class ImagePrompt(BaseModel):
+    prompt: str
     caption: str
 
 

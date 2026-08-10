@@ -42,6 +42,13 @@ ROUTES: dict[str, Route] = {
     # the reasoning process headroom before it has to emit anything.
     "figure_planning": Route(tier="reasoning", effort_field="EFFORT_PLANNING", max_completion_tokens=4000),
     "chart_spec": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=1200),
+    # Illustrations (decorative only, see figures/schemas.py's IllustrationRequest
+    # docstring for why these are kept separate from figure_planning/chart_spec).
+    # illustration_planning mirrors figure_planning's tier/cap; image_prompt is a
+    # short, fast-tier call, not the image generation itself (that's a separate,
+    # non-chat OpenAI endpoint — see LLMProvider.generate_image).
+    "illustration_planning": Route(tier="reasoning", effort_field="EFFORT_PLANNING", max_completion_tokens=4000),
+    "image_prompt": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=600),
 }
 
 

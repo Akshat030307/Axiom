@@ -1,0 +1,70 @@
+# Isolated, additive-only production stack — own network, own volumes, own
+# ports (3010/8010), no Redis (confirmed unused anywhere in the backend).
+# Deliberately does NOT join the host's existing `mesh_default` network or
+# touch anything belonging to the other two live services already running
+# on this box (ai-persona, balbodh-api) — see the deploy plan for why.
+services:
+  postgres:
+    image: pgvector/pgvector:pg17-trixie
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 300M
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "8010:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - backend_data:/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.4"
+          memory: 700M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
+    env_file:
+      - .env.production
+    ports:
+      - "3010:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 300M
+
+volumes:
+  postgres_data:
+  backend_data:

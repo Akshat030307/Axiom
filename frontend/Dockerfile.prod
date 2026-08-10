@@ -1,0 +1,27 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# NEXT_PUBLIC_* vars are inlined into the client bundle by `next build`
+# itself, not read at container runtime — env_file/environment on the
+# compose service only affects the running container, which is too late.
+# Must be real ARGs, passed explicitly from docker-compose.prod.yml's
+# build.args, promoted to ENV so the build step actually sees them.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+
+# Baked into the image at build time, not run-time — this is the exact
+# difference from the dev Dockerfile (which runs `next dev`, unsuitable for
+# production: unoptimized, hot-reload watcher overhead, and the nested-route
+# dev-server bug fought earlier this session that a real build doesn't have).
+RUN npm run build
+
+EXPOSE 3000
+CMD ["npx", "next", "start", "-p", "3000"]

@@ -1,0 +1,9 @@
+# core.autocrlf=true on this (Windows) dev machine was silently converting
+# LF to CRLF on `git archive` export (not just checkout, which is the
+# commonly-known half of this footgun) — invisible all session because
+# local Docker builds read the Windows filesystem directly, bypassing git
+# entirely. Broke entrypoint.sh's shebang the first time a real transfer
+# (git archive to a Linux VPS) actually happened: `env: 'bash\r': No such
+# file or directory`. Force LF everywhere, unconditionally, regardless of
+# local autocrlf config.
+* text=auto eol=lf

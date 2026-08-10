@@ -45,6 +45,14 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/app:/app/app
+      # FIGURES_DIR (/data/figures) and EXPORTS_DIR (/data/exports) previously
+      # had no volume at all — generated chart/illustration PNGs and exported
+      # PDFs lived only in the container's own ephemeral filesystem layer, so
+      # any container recreation (a config change, `docker compose up -d`
+      # picking up a new .env value, etc.) silently wiped every figure ever
+      # generated while the DB rows referencing them survived untouched,
+      # leaving /figures/{id}/file 404ing for real, previously-working data.
+      - backend_data:/data
 
   frontend:
     build:
@@ -63,3 +71,4 @@ services:
 volumes:
   postgres_data:
   frontend_node_modules:
+  backend_data:

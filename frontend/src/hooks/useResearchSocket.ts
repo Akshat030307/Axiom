@@ -18,6 +18,19 @@ const PING_INTERVAL_MS = 20_000;
 const BACKOFF_MIN_MS = 1_000;
 const BACKOFF_MAX_MS = 30_000;
 
+// A single chronological log entry for the live activity feed — real events
+// only (node transitions, source discoveries), never the rotating witty
+// copy, which stays purely client-side and is never mixed into this array.
+export interface ActivityEvent {
+  id: string;
+  kind: "node_started" | "node_finished" | "source_found";
+  node: string | null;
+  source: SourceFrameData | null;
+  ts: number;
+}
+
+const ACTIVITY_HISTORY_LIMIT = 60;
+
 export interface ResearchSocketState {
   status: string | null;
   mode: string | null;
@@ -32,6 +45,10 @@ export interface ResearchSocketState {
   citations: Citation[];
   connected: boolean;
   terminalError: { message: string; recoverable: boolean } | null;
+  // Name of the node currently in flight (has a node_started with no
+  // matching node_finished yet), or null between runs / once complete.
+  currentNode: string | null;
+  activity: ActivityEvent[];
 }
 
 function createInitialState(): ResearchSocketState {
@@ -49,6 +66,8 @@ function createInitialState(): ResearchSocketState {
     citations: [],
     connected: false,
     terminalError: null,
+    currentNode: null,
+    activity: [],
   };
 }
 
@@ -72,7 +91,21 @@ function reduce(state: ResearchSocketState, action: Action): ResearchSocketState
     case "frame": {
       const { frame } = action;
       switch (frame.type) {
-        case "snapshot":
+        case "snapshot": {
+          // node_traces only exist for nodes that already finished (@traced
+          // writes the row on completion, not on start), so this backfills
+          // the feed's history on a mid-run reconnect/refresh but can't know
+          // which node is *currently* in flight — that arrives naturally
+          // with the next real node_started frame a moment later.
+          const backfilled: ActivityEvent[] = [...frame.data.node_traces]
+            .sort((a, b) => a.seq - b.seq)
+            .map((t) => ({
+              id: `snapshot-${t.node}-${t.seq}`,
+              kind: "node_finished" as const,
+              node: t.node,
+              source: null,
+              ts: 0,
+            }));
           return {
             ...state,
             status: frame.data.status,
@@ -85,24 +118,48 @@ function reduce(state: ResearchSocketState, action: Action): ResearchSocketState
             sources: frame.data.sources,
             contradictions: frame.data.contradictions,
             reportMarkdown: frame.data.report_markdown,
+            activity: backfilled.slice(-ACTIVITY_HISTORY_LIMIT),
           };
+        }
         case "progress":
           return { ...state, stage: frame.data.stage };
         case "stat":
           return { ...state, stat: frame.data };
         case "source_found":
-          return { ...state, sources: [...state.sources, frame.data] };
+          return {
+            ...state,
+            sources: [...state.sources, frame.data],
+            activity: [
+              ...state.activity,
+              { id: `source-${frame.data.source_id}`, kind: "source_found" as const, node: null, source: frame.data, ts: Date.now() },
+            ].slice(-ACTIVITY_HISTORY_LIMIT),
+          };
         case "contradiction_found":
           return { ...state, contradictions: [...state.contradictions, frame.data] };
         case "report_chunk":
           return { ...state, reportMarkdown: state.reportMarkdown + frame.data.delta };
         case "done":
-          return { ...state, status: "completed" };
+          return { ...state, status: "completed", currentNode: null };
         case "error":
-          return { ...state, status: "error", terminalError: frame.data };
+          return { ...state, status: "error", terminalError: frame.data, currentNode: null };
         case "node_started":
+          return {
+            ...state,
+            currentNode: frame.data.node,
+            activity: [
+              ...state.activity,
+              { id: `${frame.data.node}-start-${Date.now()}`, kind: "node_started" as const, node: frame.data.node, source: null, ts: Date.now() },
+            ].slice(-ACTIVITY_HISTORY_LIMIT),
+          };
         case "node_finished":
-          return state;
+          return {
+            ...state,
+            currentNode: state.currentNode === frame.data.node ? null : state.currentNode,
+            activity: [
+              ...state.activity,
+              { id: `${frame.data.node}-finish-${Date.now()}`, kind: "node_finished" as const, node: frame.data.node, source: null, ts: Date.now() },
+            ].slice(-ACTIVITY_HISTORY_LIMIT),
+          };
         default:
           return state;
       }

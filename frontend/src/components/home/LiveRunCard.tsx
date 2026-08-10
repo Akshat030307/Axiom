@@ -10,9 +10,9 @@ import { useResearchSocket } from "@/hooks/useResearchSocket";
 import { modeLabel } from "@/lib/tokens";
 import { relativeTime } from "@/lib/format";
 import { StatusIcon, type Status } from "@/components/ui/StatusIcon";
+import { ActivityFeed } from "@/components/run/ActivityFeed";
 import { ProgressTimeline } from "@/components/run/ProgressTimeline";
 import { StatStrip } from "@/components/run/StatStrip";
-import { HeroHorizon } from "./HeroHorizon";
 
 export function LiveRunCard({ runId }: { runId: string }) {
   const { accessToken } = useAuth();
@@ -66,12 +66,9 @@ export function LiveRunCard({ runId }: { runId: string }) {
           </p>
         </div>
 
-        <div className="relative flex min-h-[280px] items-center justify-end overflow-hidden rounded-2xl border border-border">
-          <HeroHorizon />
-          {/* Scrim guarantees the timeline stays legible regardless of where
-              the photo's bright rim lands underneath it. */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-l from-black/60 via-black/15 to-transparent" />
-          <div className="relative z-10 w-full max-w-sm px-8 py-6">
+        <div className="flex flex-col gap-6 rounded-2xl border border-border p-7">
+          <ActivityFeed status={status} currentNode={state.currentNode} activity={state.activity} />
+          <div className="border-t border-border pt-6">
             <ProgressTimeline stage={state.stage} status={status} stat={state.stat} />
           </div>
         </div>

@@ -22,7 +22,7 @@ interface NavItem {
 // three (plus Search) are out of scope for Phase 4 and land on placeholder
 // pages so the rail never dead-ends into a 404.
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Home", icon: Home, match: (p) => p === "/" },
+  { href: "/home", label: "Home", icon: Home, match: (p) => p === "/home" },
   { href: "/search", label: "Search", icon: Search, match: (p) => p.startsWith("/search") },
   { href: "/history", label: "Projects", icon: FolderClosed, match: (p) => p.startsWith("/history") },
   { href: "/evaluation", label: "Analytics", icon: BarChart3, match: (p) => p.startsWith("/evaluation") },
@@ -37,7 +37,7 @@ export function IconRail() {
   return (
     <nav className="fixed inset-y-0 left-0 z-40 flex w-[110px] flex-col items-center gap-8 border-r border-border bg-black py-7">
       <Tooltip label="Axiom — Research, without the noise.">
-        <Link href="/" aria-label="Axiom home">
+        <Link href="/home" aria-label="Axiom home">
           <Logo size={34} />
         </Link>
       </Tooltip>

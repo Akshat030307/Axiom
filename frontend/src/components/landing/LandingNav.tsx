@@ -24,7 +24,7 @@ export function LandingNav() {
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur">
       <div className="mx-auto flex max-w-[1400px] items-center justify-between px-8 py-4">
-        <Link href="/welcome" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5">
           <Logo size={30} />
           <span className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-[-0.01em] text-fg">
             Axiom

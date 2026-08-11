@@ -1,4 +1,8 @@
+"use client";
+
 import { BookOpenCheck, Compass, FileSearch, Gauge, GitCompareArrows, Globe, PenLine } from "lucide-react";
+import { motion, useReducedMotion, useMotionValue, animate } from "motion/react";
+import { useEffect, useState } from "react";
 
 import { Logo } from "@/components/shell/Logo";
 import { StatusIcon } from "@/components/ui/StatusIcon";
@@ -25,7 +29,24 @@ const CHART_BARS = [
   { label: "Cryogenic Distillation", value: 91 },
 ];
 
+function SourcesCount({ value, reduceMotion }: { value: number; reduceMotion: boolean }) {
+  const [display, setDisplay] = useState(reduceMotion ? value : 0);
+  const count = useMotionValue(reduceMotion ? value : 0);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const controls = animate(count, value, { duration: 1.4, delay: 0.6, ease: "easeOut" });
+    return () => controls.stop();
+  }, [count, value, reduceMotion]);
+
+  useEffect(() => count.on("change", (v) => setDisplay(Math.round(v))), [count]);
+
+  return <>{display.toLocaleString()}</>;
+}
+
 export function LandingPreviewPanel() {
+  const reduceMotion = useReducedMotion() ?? false;
+
   return (
     <div className="overflow-hidden rounded-card border border-border bg-surface">
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -57,20 +78,31 @@ export function LandingPreviewPanel() {
           <p className="text-xs font-medium uppercase tracking-[0.08em] text-fg-subtle">Live Activity Feed</p>
           <ul className="flex flex-col gap-3">
             {FEED.map((row, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm">
+              <motion.li
+                key={i}
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 + i * 0.12 }}
+                className="flex items-start gap-2.5 text-sm"
+              >
                 <StatusIcon state={row.done ? "complete" : "active"} size={15} className="mt-0.5" />
                 <row.icon size={14} className="mt-0.5 shrink-0 text-fg-subtle" />
                 <div>
                   <p className="text-fg">{row.label}</p>
                   <p className="text-xs text-fg-subtle">{row.detail}</p>
                 </div>
-              </li>
+              </motion.li>
             ))}
-            <li className="flex items-start gap-2.5 text-sm text-fg-subtle">
+            <motion.li
+              initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0.3 + FEED.length * 0.12 }}
+              className="flex items-start gap-2.5 text-sm text-fg-subtle"
+            >
               <GitCompareArrows size={14} className="mt-0.5 shrink-0" />
               <PenLine size={14} className="mt-0.5 shrink-0" />
               <span>Resolving conflicts, then synthesizing…</span>
-            </li>
+            </motion.li>
           </ul>
         </div>
 
@@ -81,14 +113,25 @@ export function LandingPreviewPanel() {
               <span className="tabular-nums text-fg-muted">5 / 7 stages</span>
             </p>
             <div className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-raised">
-              <div className="h-full w-[71%] rounded-pill bg-fg" />
+              <motion.div
+                initial={reduceMotion ? false : { width: "0%" }}
+                animate={{ width: "71%" }}
+                transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+                className="h-full rounded-pill bg-fg"
+              />
             </div>
             <ul className="mt-3 flex flex-col gap-1.5">
               {STAGES.map((s, i) => (
-                <li key={s} className="flex items-center gap-2 text-xs text-fg-muted">
+                <motion.li
+                  key={s}
+                  initial={reduceMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.4 + i * 0.08 }}
+                  className="flex items-center gap-2 text-xs text-fg-muted"
+                >
                   <StatusIcon state={i < 5 ? "complete" : "pending"} size={11} />
                   {s}
-                </li>
+                </motion.li>
               ))}
             </ul>
           </div>
@@ -96,7 +139,7 @@ export function LandingPreviewPanel() {
           <div className="border-t border-border pt-4">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-fg-subtle">Sources Found</p>
             <p className="mt-1 font-[family-name:var(--font-display)] text-3xl font-semibold tabular-nums text-fg">
-              1,575
+              <SourcesCount value={1575} reduceMotion={reduceMotion} />
             </p>
             <div className="mt-2 flex flex-col gap-1 text-xs text-fg-muted">
               <span>1,247 Academic (OpenAlex)</span>
@@ -117,12 +160,14 @@ export function LandingPreviewPanel() {
         </p>
         <p className="mb-2 text-xs text-fg-subtle">Cost of CO&#8322; Captured (USD / ton)</p>
         <div className="flex items-end gap-4 border-b border-border pb-3">
-          {CHART_BARS.map((bar) => (
+          {CHART_BARS.map((bar, i) => (
             <div key={bar.label} className="flex flex-1 flex-col items-center gap-2">
               <div className="flex h-24 w-full items-end">
-                <div
+                <motion.div
+                  initial={reduceMotion ? false : { height: "0%" }}
+                  animate={{ height: `${bar.value}%` }}
+                  transition={{ duration: 0.7, ease: "easeOut", delay: 0.9 + i * 0.1 }}
                   className="w-full rounded-t-sm bg-fg-muted"
-                  style={{ height: `${bar.value}%` }}
                 />
               </div>
               <span className="text-center text-[10px] leading-tight text-fg-subtle">{bar.label}</span>

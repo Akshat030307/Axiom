@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Github } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { Logo } from "@/components/shell/Logo";
 
@@ -12,8 +15,14 @@ const NAV_LINKS = [
 ];
 
 export function LandingNav() {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur">
+    <motion.header
+      initial={reduceMotion ? false : { opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur">
       <div className="mx-auto flex max-w-[1400px] items-center justify-between px-8 py-4">
         <Link href="/welcome" className="flex items-center gap-2.5">
           <Logo size={30} />
@@ -59,6 +68,6 @@ export function LandingNav() {
           </Link>
         </div>
       </div>
-    </header>
+    </motion.header>
   );
 }

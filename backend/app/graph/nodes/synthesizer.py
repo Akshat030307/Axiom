@@ -182,7 +182,15 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
     # order — retriever.py populated this; synthesizer only consumes it now.
     selected = state.get("retrieved_evidence") or []
     contradictions = state.get("contradictions", [])
-    figures = state.get("figures") or []
+    # Figures with a paired_figure_id are a real photo web_image_fetcher
+    # attached to a specific illustration — ReportFigure.tsx renders that
+    # pairing automatically wherever the illustration's own figure:// marker
+    # lands, so the model never needs (and isn't offered) the photo's own
+    # id. Excluding it here, not just from the prompt text, also keeps it
+    # out of valid_figure_ids below — if the model ever did emit a
+    # coincidentally-matching reference, it gets stripped rather than
+    # rendering the photo a second time.
+    figures = [fig for fig in (state.get("figures") or []) if not fig.paired_figure_id]
     sources_by_id = await _fetch_sources_by_id(ctx, {ev.source_id for ev in selected})
     evidence_by_id = {ev.id: ev for ev in selected}
 

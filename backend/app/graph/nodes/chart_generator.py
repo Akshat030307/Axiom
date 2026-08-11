@@ -108,7 +108,11 @@ async def chart_generator_node(state: ResearchState, ctx: RunContext) -> NodeRes
     web_researcher.py's docstring on the same simplification). A rejected or
     failed figure is dropped, logged, and does not abort the run; the
     synthesizer only ever sees figures that made it into `figures`."""
-    requests: list[FigureRequest] = state.get("figure_requests") or []
+    # figure_requests can now also contain kind="diagram" requests, handled
+    # entirely by diagram_generator.py — filter to this node's own kind
+    # rather than assuming every request is a chart (true only back when
+    # FigureRequest.kind had no other value it could be).
+    requests: list[FigureRequest] = [r for r in (state.get("figure_requests") or []) if r.kind == "chart"]
     evidence: list[Evidence] = state.get("retrieved_evidence") or []
     evidence_by_id = {ev.id: ev for ev in evidence}
 

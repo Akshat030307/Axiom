@@ -67,7 +67,16 @@ async def figure_planner_node(state: ResearchState, ctx: RunContext) -> NodeResu
             )
             dropped_bad_ids += 1
             continue
-        if len(req.evidence_ids) < 2:
+        # A chart needs at least two comparable points to be worth drawing;
+        # a diagram depicts a single named structure/process (an
+        # architecture, a pipeline, a sequence) and is grounded by what it's
+        # *about*, not by a count of numeric evidence — but it still needs
+        # at least one id, same defensive reasoning as illustration_planner:
+        # figures.evidence_ids has a DB CheckConstraint requiring at least
+        # one (figure_must_be_attributed), so drop here rather than let
+        # chart_generator/diagram_generator's INSERT fail later.
+        min_evidence = 2 if req.kind == "chart" else 1
+        if len(req.evidence_ids) < min_evidence:
             continue
         accepted.append(req)
         if len(accepted) >= settings.MAX_FIGURES_PER_REPORT:

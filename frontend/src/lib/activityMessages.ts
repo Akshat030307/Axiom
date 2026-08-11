@@ -12,6 +12,7 @@ import {
   PenLine,
   ShieldCheck,
   Sparkles,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,8 +36,10 @@ const NODE_MESSAGES: Record<string, NodeMessage> = {
   contradiction_detector: { label: "Comparing findings for conflicts", icon: GitCompareArrows },
   figure_planner: { label: "Deciding what deserves a chart", icon: LineChart },
   chart_generator: { label: "Building a chart from the data", icon: LineChart },
+  diagram_generator: { label: "Drawing a diagram", icon: Workflow },
   illustration_planner: { label: "Considering an illustration", icon: ImageIcon },
   image_generator: { label: "Generating an illustration", icon: ImageIcon },
+  web_image_fetcher: { label: "Finding a real photo to match", icon: Globe },
   synthesizer: { label: "Synthesizing the answer", icon: PenLine },
   citation_validator: { label: "Checking every citation", icon: ListChecks },
   force_finalize: { label: "Wrapping up the report", icon: ListChecks },

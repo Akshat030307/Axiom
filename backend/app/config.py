@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     IMAGE_COST_PER_IMAGE_USD: float = 0.005
     MAX_ILLUSTRATIONS_PER_REPORT: int = 2
     MAX_IMAGE_BYTES: int = 5_242_880
+    # How many Tavily image-search candidates web_image_fetcher tries (in
+    # ranked order) before giving up on finding a real photo to pair with a
+    # given illustration — most queries succeed on the first candidate; this
+    # is a fallback for when it fails validation (wrong content-type, too
+    # small, fails to decode).
+    WEB_IMAGE_SEARCH_CANDIDATES: int = 3
     RUN_TIMEOUT_SECONDS: int = 900
     TOOL_TIMEOUT_SECONDS: int = 30
     # Trimmed dataset (5 quick-mode questions, eval/dataset/questions.jsonl)

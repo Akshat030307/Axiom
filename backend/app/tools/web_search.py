@@ -24,3 +24,26 @@ async def search(query: str, max_results: int = 5) -> list[dict]:
         timeout=settings.TOOL_TIMEOUT_SECONDS,
     )
     return response.get("results", [])
+
+
+async def search_images(query: str, max_results: int = 3) -> list[dict]:
+    """Tavily's own image search (include_images/include_image_descriptions)
+    — genuinely relevant candidates tied to the query, already picked by
+    Tavily's ranking, rather than scraping <img> tags off fetched pages
+    (PRD's original image_harvester design, never built). Each result is
+    {"url": ..., "description": ...}; still passed through the SSRF guard
+    and content/dimension validation in figures/image_fetcher.py before
+    anything is downloaded — a URL coming back from a third-party API isn't
+    trusted any more than one scraped from a page."""
+    response = await asyncio.to_thread(
+        _client.search,
+        query,
+        max_results=1,
+        search_depth="basic",
+        include_images=True,
+        include_image_descriptions=True,
+        include_answer=False,
+        include_raw_content=False,
+        timeout=settings.TOOL_TIMEOUT_SECONDS,
+    )
+    return (response.get("images") or [])[:max_results]

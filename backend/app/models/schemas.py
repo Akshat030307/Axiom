@@ -77,15 +77,19 @@ class Figure(BaseModel):
     evidence_ids: list[str]
     source_id: str | None = None
     license_note: str | None = None
+    # Set only on a kind="source_image" figure fetched to accompany a
+    # specific kind="illustration" figure (see web_image_fetcher.py) — points
+    # at that illustration's id. Null for every other figure, including a
+    # standalone source_image with no illustration pairing.
+    paired_figure_id: str | None = None
 
 
-# kind is constrained to "chart" only (rather than the full Figure.kind
-# Literal) because this build skips image_harvester and diagram_generator
-# entirely — OpenAI's strict structured-output mode then makes it
-# *impossible* for figure_planner to request anything this codebase can't
-# actually produce, rather than relying on a prompt instruction alone.
+# kind excludes "source_image" (rather than the full Figure.kind Literal)
+# because this build skips image_harvester entirely — OpenAI's strict
+# structured-output mode then makes it *impossible* for figure_planner to
+# request a source_image, rather than relying on a prompt instruction alone.
 class FigureRequest(BaseModel):
-    kind: Literal["chart"]
+    kind: Literal["chart", "diagram"]
     intent: str
     evidence_ids: list[str]
     caption: str
@@ -140,6 +144,22 @@ class ChartSpec(BaseModel):
             if len(s.values) != len(self.categories):
                 raise ValueError("series length must equal categories length")
         return self
+
+
+# The LLM emits Mermaid *source* (text), never pixels — figures/diagram_
+# renderer.py renders it deterministically with mmdc. That's the entire
+# point relative to image_generator's illustrations: a diffusion image model
+# reliably mangles rendered text and precise structure, but a diagram
+# rendered from the model's own text is exactly the text/boxes/arrows it
+# wrote, nothing lost in an image-generation step. The model can still be
+# factually wrong about the domain (same risk as any LLM-authored prose in
+# the report), but it isn't at risk of the image *renderer* introducing new
+# errors on top of that.
+class DiagramSpec(BaseModel):
+    diagram_type: Literal["flowchart", "sequenceDiagram", "timeline", "mindmap", "quadrantChart"]
+    title: str
+    mermaid_source: str
+    evidence_ids: list[str]
 
 
 class Citation(BaseModel):

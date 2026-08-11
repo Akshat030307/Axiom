@@ -63,6 +63,9 @@ _PAGE_CSS = """
   figure img { max-width: 100%; }
   figure.figure-illustration img { max-width: 170pt; }
   figure.figure-illustration figcaption { max-width: 170pt; margin-left: auto; margin-right: auto; }
+  figure.figure-photo img { max-width: 190pt; }
+  figure.figure-photo figcaption { max-width: 190pt; margin-left: auto; margin-right: auto; }
+  .figure-pair { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 12pt; }
   figcaption { color: #666; font-size: 8.5pt; margin-top: 4pt; }
   .sources-table td:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
   .sources-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
@@ -86,31 +89,56 @@ def _figure_data_uri(figure: Figure) -> str | None:
     return f"data:{figure.mime_type};base64,{base64.b64encode(data).decode('ascii')}"
 
 
+def _figure_html(figure: Figure, caption: str, css_class: str) -> str | None:
+    data_uri = _figure_data_uri(figure)
+    if data_uri is None:
+        return None
+    class_attr = f' class="{css_class}"' if css_class else ""
+    return f'<figure{class_attr}><img src="{data_uri}" alt="{caption}"><figcaption>{caption}</figcaption></figure>'
+
+
 def _inline_figures(markdown: str, figures_by_id: dict[str, Figure]) -> str:
     """Rewrites `figure://{id}` to a base64 data URI (PRD §14) so the PDF
     needs no network access and no auth to render. A reference to an id
     that isn't a real, readable figure falls back to plain text — the
     synthesizer already strips unknown ids before persisting the report, so
-    this only fires for a figure file that's gone missing on disk."""
+    this only fires for a figure file that's gone missing on disk.
+
+    An illustration with a paired real photo (web_image_fetcher.py) renders
+    both side by side, same pairing ReportFigure.tsx does on the live page —
+    the photo never has its own figure:// marker (synthesizer.py excludes
+    paired figures from the model's prompt), so this is the only place it
+    gets attached to the export."""
+    paired_by_illustration_id = {
+        fig.paired_figure_id: fig for fig in figures_by_id.values() if fig.paired_figure_id
+    }
 
     def _repl(m: "re.Match[str]") -> str:
         caption = _strip_text(m.group(1)) or "Figure"
         figure = figures_by_id.get(m.group(2))
-        data_uri = _figure_data_uri(figure) if figure else None
-        if data_uri is None:
+        if figure is None:
             return f'<div class="figure-placeholder">{caption} — not available in this export</div>'
+
         # Same rule as ReportFigure.tsx: an illustration has no equivalent to
         # a chart's value-grounding check, so every render says so — the PDF
         # export path can't rely on frontend code to add this.
-        is_illustration = figure is not None and figure.kind == "illustration"
-        if is_illustration:
-            caption = f"{caption} — AI-generated illustration, not derived from evidence"
+        is_illustration = figure.kind == "illustration"
+        illustration_caption = f"{caption} — AI-generated illustration, not derived from evidence" if is_illustration else caption
         # Charts carry data and need the room to stay legible; an
         # illustration is decorative only, sized like a small figure in a
         # printed book rather than a hero image (same distinction
-        # ReportFigure.tsx makes on the frontend).
-        figure_class = ' class="figure-illustration"' if is_illustration else ""
-        return f'<figure{figure_class}><img src="{data_uri}" alt="{caption}"><figcaption>{caption}</figcaption></figure>'
+        # ReportFigure.tsx makes on the frontend). Its paired photo — the
+        # more credible of the two — renders a little larger, same as on
+        # the live page.
+        illustration_html = _figure_html(figure, illustration_caption, "figure-illustration" if is_illustration else "")
+        if illustration_html is None:
+            return f'<div class="figure-placeholder">{caption} — not available in this export</div>'
+
+        photo = paired_by_illustration_id.get(figure.id) if is_illustration else None
+        photo_html = _figure_html(photo, _strip_text(photo.caption), "figure-photo") if photo else None
+        if photo_html is None:
+            return illustration_html
+        return f'<div class="figure-pair">{photo_html}{illustration_html}</div>'
 
     return _FIGURE_MD_RE.sub(_repl, markdown)
 

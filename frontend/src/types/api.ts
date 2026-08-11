@@ -188,4 +188,5 @@ export interface FigureResponse {
   alt_text: string;
   mime_type: string;
   evidence_ids: string[];
+  paired_figure_id: string | null;
 }

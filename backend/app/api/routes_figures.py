@@ -21,6 +21,7 @@ class FigureResponse(BaseModel):
     alt_text: str
     mime_type: str
     evidence_ids: list[uuid.UUID]
+    paired_figure_id: uuid.UUID | None = None
 
 
 @research_figures_router.get("/{run_id}/figures", response_model=list[FigureResponse])
@@ -33,6 +34,7 @@ async def list_figures(
         FigureResponse(
             id=f.id, kind=f.kind, caption=f.caption, alt_text=f.alt_text,
             mime_type=f.mime_type, evidence_ids=f.evidence_ids,
+            paired_figure_id=f.paired_figure_id,
         )
         for f in rows
     ]

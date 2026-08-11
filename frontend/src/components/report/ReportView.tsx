@@ -50,6 +50,19 @@ export function ReportView({ markdown, citations, evidenceById, figuresById }: R
     return map;
   }, [citations]);
 
+  // A paired source_image never gets its own figure:// marker (synthesizer.py
+  // excludes it from the model's prompt entirely) — this is the only way it
+  // ever reaches the page: found here by its paired_figure_id and rendered
+  // alongside whichever illustration figure lands wherever the model placed
+  // *that* marker.
+  const pairedByIllustrationId = useMemo(() => {
+    const map = new Map<string, FigureResponse>();
+    for (const fig of figuresById.values()) {
+      if (fig.paired_figure_id) map.set(fig.paired_figure_id, fig);
+    }
+    return map;
+  }, [figuresById]);
+
   function withCitations(children: ReactNode): ReactNode {
     return Children.map(children, (child) => {
       if (typeof child !== "string") return child;
@@ -88,7 +101,15 @@ export function ReportView({ markdown, citations, evidenceById, figuresById }: R
                 const figureId = src.slice("figure://".length);
                 const figure = figuresById.get(figureId);
                 if (!figure) return <FigurePlaceholder alt={alt} />;
-                return <ReportFigure figureId={figure.id} caption={figure.caption} kind={figure.kind} />;
+                const paired = pairedByIllustrationId.get(figure.id);
+                return (
+                  <ReportFigure
+                    figureId={figure.id}
+                    caption={figure.caption}
+                    kind={figure.kind}
+                    pairedPhoto={paired ? { figureId: paired.id, caption: paired.caption } : null}
+                  />
+                );
               }
               // eslint-disable-next-line @next/next/no-img-element -- external report images aren't known to next/image
               return <img src={src} alt={alt ?? ""} className="my-3 max-w-full rounded-input" />;

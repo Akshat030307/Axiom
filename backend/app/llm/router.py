@@ -50,6 +50,15 @@ ROUTES: dict[str, Route] = {
     # non-chat OpenAI endpoint — see LLMProvider.generate_image).
     "illustration_planning": Route(tier="reasoning", effort_field="EFFORT_PLANNING", max_completion_tokens=4000),
     "image_prompt": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=600),
+    # diagram_spec, unlike chart_spec, isn't transcribing already-provided
+    # numeric evidence — it's recalling the real structure of a named
+    # architecture/process from the model's own training, which is the
+    # entire point relative to image_generator's decorative illustrations.
+    # That's a reasoning-tier job, not a fast-tier extraction one; same
+    # effort field as synthesis (both are "produce accurate, well-structured
+    # content" tasks). Mermaid source with several labeled nodes runs longer
+    # than chart_spec's compact numeric JSON, so the cap is higher too.
+    "diagram_spec": Route(tier="reasoning", effort_field="EFFORT_SYNTHESIS", max_completion_tokens=2500),
 }
 
 

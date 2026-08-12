@@ -207,18 +207,22 @@ async def render_report_html(db: AsyncSession, run: ResearchRun, report_markdown
     body_html = _render_body_html(report_markdown, figures_by_id)
     sources_html = await _render_sources_table(db, run.id)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    query = _strip_text(run.query)
+    # planner_node persists the plan (incl. a real report title, distinct
+    # from whatever the user actually typed) onto run.plan — fall back to
+    # the raw query only for a run from before this existed, or if planning
+    # somehow completed without persisting.
+    title = _strip_text((run.plan or {}).get("title") or run.query)
     mode = _strip_text(run.mode)
 
     return f"""<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>{query}</title>
+<title>{title}</title>
 <style>{_PAGE_CSS}</style>
 </head>
 <body>
-<h1 class="report-title">{query}</h1>
+<h1 class="report-title">{title}</h1>
 <p class="report-meta">{mode} research &bull; generated {generated_at}</p>
 {body_html}
 <h2>Sources (by credibility)</h2>

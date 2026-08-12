@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   ServerFrameSchema,
   type ContradictionFrameData,
+  type PlanFrameData,
   type ServerFrame,
   type SourceFrameData,
   type StatFrameData,
@@ -35,7 +36,7 @@ export interface ResearchSocketState {
   status: string | null;
   mode: string | null;
   query: string | null;
-  plan: unknown;
+  plan: PlanFrameData | null;
   stage: string | null;
   stageOrder: string[];
   stat: StatFrameData | null;
@@ -136,6 +137,8 @@ function reduce(state: ResearchSocketState, action: Action): ResearchSocketState
           };
         case "contradiction_found":
           return { ...state, contradictions: [...state.contradictions, frame.data] };
+        case "plan_ready":
+          return { ...state, plan: frame.data };
         case "report_chunk":
           return { ...state, reportMarkdown: state.reportMarkdown + frame.data.delta };
         case "done":

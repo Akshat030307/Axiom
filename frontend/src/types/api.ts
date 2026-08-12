@@ -47,6 +47,7 @@ export interface Citation {
 }
 
 export interface ReportResponse {
+  title: string | null;
   markdown: string;
   citations: Citation[];
   figures: unknown[];

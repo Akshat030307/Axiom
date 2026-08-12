@@ -56,6 +56,8 @@ async def _build_snapshot_data(db, run: ResearchRun) -> dict:
     else:
         stat = {**(await compute_run_stat_counts(db, run.id)), "eta_seconds": None}
 
+    plan = channel.plan if channel is not None and channel.plan is not None else run.plan
+
     report_markdown = ""
     if run.status == "completed":
         report = await db.scalar(select(Report).where(Report.run_id == run.id).order_by(Report.created_at.desc()))

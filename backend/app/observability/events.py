@@ -28,6 +28,7 @@ FrameType = Literal[
     "stat",
     "source_found",
     "contradiction_found",
+    "plan_ready",
     "report_chunk",
     "done",
     "error",
@@ -115,6 +116,7 @@ class _RunChannel:
         self.stat: dict[str, Any] | None = None
         self.sources: list[dict[str, Any]] = []
         self.contradictions: list[dict[str, Any]] = []
+        self.plan: dict[str, Any] | None = None
         self.report_text: str = ""
         self.terminal_frame: dict[str, Any] | None = None  # the `done`/`error` frame, once sent
 
@@ -184,6 +186,8 @@ class RunEventBus:
             channel.sources.append(data)
         elif frame_type == "contradiction_found":
             channel.contradictions.append(data)
+        elif frame_type == "plan_ready":
+            channel.plan = data
         elif frame_type == "report_chunk":
             channel.report_text += data.get("delta", "")
         elif frame_type in ("done", "error"):
@@ -286,6 +290,17 @@ class RunEvents:
             "source_found",
             {"source_id": source_id, "title": title, "domain": domain, "source_type": source_type, "credibility_score": credibility_score},
         )
+
+    def plan_ready(self, *, plan: dict[str, Any]) -> None:
+        """Fired once, right after planner_node persists ResearchRun.plan —
+        the only way an *already-connected* client (the common case: it
+        connects the instant a new run starts, well before planning
+        finishes) learns the plan without waiting for a reconnect. A fresh
+        connection gets the same data from `snapshot` instead (ws.py reads
+        run.plan, committed by the same node) — takes the full dumped plan,
+        not just title/objective, so both paths hand the frontend the exact
+        same shape regardless of which one it happens to receive."""
+        self.bus.publish(self.run_id, "plan_ready", plan)
 
     def contradiction_found(self, *, topic: str, evidence_a_id: str, evidence_b_id: str) -> None:
         self.bus.publish(

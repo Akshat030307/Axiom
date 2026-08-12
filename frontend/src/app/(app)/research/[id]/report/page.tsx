@@ -56,6 +56,12 @@ export default function ReportPage() {
         </p>
       )}
 
+      {report?.title && (
+        <h1 className="mb-6 font-[family-name:var(--font-display)] text-3xl font-semibold tracking-[-0.01em] text-fg">
+          {report.title}
+        </h1>
+      )}
+
       {report && (
         <ReportView
           markdown={report.markdown}

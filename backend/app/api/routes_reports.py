@@ -18,6 +18,7 @@ settings = get_settings()
 
 
 class ReportResponse(BaseModel):
+    title: str | None = None
     markdown: str
     citations: list
     figures: list = []
@@ -45,7 +46,8 @@ async def get_report(
     db: AsyncSession = Depends(get_db),
 ) -> ReportResponse:
     report = await _get_report_or_404(run, db)
-    return ReportResponse(markdown=report.content_markdown, citations=report.citations, figures=[])
+    title = (run.plan or {}).get("title")
+    return ReportResponse(title=title, markdown=report.content_markdown, citations=report.citations, figures=[])
 
 
 @router.post("/{run_id}/report/pdf", response_model=ExportPdfResponse)

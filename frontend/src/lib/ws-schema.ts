@@ -44,11 +44,25 @@ export const StatSchema = z.object({
 });
 export type StatFrameData = z.infer<typeof StatSchema>;
 
+// Mirrors ResearchPlan (backend/app/models/schemas.py) exactly — this is
+// `response.parsed.model_dump()`, sent verbatim both via plan_ready and as
+// part of `snapshot` (ws.py reads the same run.plan column either way).
+export const PlanSchema = z.object({
+  title: z.string(),
+  objective: z.string(),
+  sub_questions: z.array(z.string()),
+  required_sources: z.array(z.string()),
+  estimated_depth: z.string(),
+  primary_source_required_for: z.array(z.string()),
+  expected_figures: z.array(z.string()),
+});
+export type PlanFrameData = z.infer<typeof PlanSchema>;
+
 const SnapshotDataSchema = z.object({
   status: z.string(),
   mode: z.string(),
   query: z.string(),
-  plan: z.unknown().nullable(),
+  plan: PlanSchema.nullable(),
   stage: z.string().nullable(),
   stage_order: z.array(z.string()),
   stat: StatSchema.nullable(),
@@ -82,6 +96,7 @@ export const ServerFrameSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("stat"), ...FrameEnvelope, data: StatSchema }),
   z.object({ type: z.literal("source_found"), ...FrameEnvelope, data: SourceSchema }),
   z.object({ type: z.literal("contradiction_found"), ...FrameEnvelope, data: ContradictionSchema }),
+  z.object({ type: z.literal("plan_ready"), ...FrameEnvelope, data: PlanSchema }),
   z.object({ type: z.literal("report_chunk"), ...FrameEnvelope, data: ReportChunkDataSchema }),
   z.object({ type: z.literal("done"), ...FrameEnvelope, data: DoneDataSchema }),
   z.object({ type: z.literal("error"), ...FrameEnvelope, data: ErrorDataSchema }),

@@ -31,6 +31,11 @@ export function LiveRunCard({ runId }: { runId: string }) {
   const status = state.status ?? runStatus?.status ?? "pending";
   const mode = state.mode ?? runStatus?.mode ?? "quick";
   const query = state.query ?? runStatus?.query ?? "Untitled research";
+  // Upgrades from the raw query to a real report title the moment planning
+  // finishes (plan_ready, or snapshot on a reconnect after it already has) —
+  // whatever the user actually typed ("make a report on semiconductors")
+  // isn't what should sit here once something better exists.
+  const title = state.plan?.title ?? query;
   const isDone = status === "completed";
   const isError = status === "error";
 
@@ -57,7 +62,7 @@ export function LiveRunCard({ runId }: { runId: string }) {
 
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-[-0.01em] text-fg">
-            {query}
+            {title}
           </h2>
           <p className="mt-1 text-sm text-fg-muted">
             {modeLabel(mode)} mode

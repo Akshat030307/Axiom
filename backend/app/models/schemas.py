@@ -8,6 +8,11 @@ AgentName = Literal["web_researcher", "academic_researcher", "data_researcher"]
 
 
 class ResearchPlan(BaseModel):
+    # A real report title, distinct from the user's raw query — a casual
+    # input like "make a report on semiconductors" shouldn't become the
+    # PDF's literal <h1> (see html_renderer.py, which reads this rather
+    # than run.query for exactly that reason).
+    title: str
     objective: str
     sub_questions: list[str]
     required_sources: list[SourceType]

@@ -26,12 +26,16 @@ _MD = MarkdownIt("commonmark", {"html": True}).enable("table")
 # <sup> per PRD §14 ("citation markers rendered as superscripts").
 _CITATION_MARKERS_RE = re.compile(r"((?:\[\d+\])+)")
 _FIGURE_MD_RE = re.compile(r"!\[([^\]]*)\]\(figure://([^)]*)\)")
+# synthesizer.py's one key-takeaway sentence per section — same delimiter and
+# same "never crosses a line" reasoning as ReportView.tsx's client-side parse
+# (see synthesizer.py's HIGHLIGHT_RE), applied here for the PDF export path.
+_HIGHLIGHT_RE = re.compile(r"==([^=\n]+)==")
 
 _ALLOWED_TAGS = [
     "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li",
     "strong", "em", "sup", "sub", "a", "blockquote", "hr", "br",
     "code", "pre", "table", "thead", "tbody", "tr", "th", "td",
-    "div", "span", "figure", "figcaption", "img",
+    "div", "span", "figure", "figcaption", "img", "mark",
 ]
 _ALLOWED_ATTRS = {
     "a": ["href"],
@@ -53,6 +57,7 @@ _PAGE_CSS = """
   ul, ol { margin: 0 0 10pt; padding-left: 20pt; }
   li { margin-bottom: 4pt; }
   sup { color: #555; font-size: 8pt; }
+  mark.hl { background: #fdec9c; color: inherit; padding: 0 2pt; border-radius: 2pt; }
   blockquote { border-left: 3px solid #ccc; margin: 10pt 0; padding: 2pt 12pt; color: #444; }
   table { border-collapse: collapse; width: 100%; margin: 8pt 0 16pt; font-size: 9.5pt; }
   th, td { border: 1px solid #ddd; padding: 5pt 8pt; text-align: left; }
@@ -78,6 +83,10 @@ def _strip_text(value: str) -> str:
 
 def _wrap_citation_markers(markdown: str) -> str:
     return _CITATION_MARKERS_RE.sub(r"<sup>\1</sup>", markdown)
+
+
+def _wrap_highlights(markdown: str) -> str:
+    return _HIGHLIGHT_RE.sub(r'<mark class="hl">\1</mark>', markdown)
 
 
 def _figure_data_uri(figure: Figure) -> str | None:
@@ -144,7 +153,7 @@ def _inline_figures(markdown: str, figures_by_id: dict[str, Figure]) -> str:
 
 
 def _render_body_html(report_markdown: str, figures_by_id: dict[str, Figure]) -> str:
-    processed = _wrap_citation_markers(_inline_figures(report_markdown, figures_by_id))
+    processed = _wrap_citation_markers(_wrap_highlights(_inline_figures(report_markdown, figures_by_id)))
     raw_html = _MD.render(processed)
     return bleach.clean(
         raw_html,

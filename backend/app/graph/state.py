@@ -18,6 +18,7 @@ class ResearchState(TypedDict, total=False):
     user_id: str
     query: str
     mode: Literal["quick", "deep", "academic", "competitive"]
+    highlight_enabled: bool
     plan: ResearchPlan
 
     # --- fan-in keys: MUST have reducers — Phase 1 has no concurrent writers,

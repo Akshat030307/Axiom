@@ -30,6 +30,7 @@ export interface RunStatusResponse {
   run_id: string;
   status: RunStatus;
   mode: ResearchMode;
+  highlight_enabled: boolean;
   query: string;
   started_at: string;
   completed_at: string | null;

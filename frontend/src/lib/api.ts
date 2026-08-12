@@ -86,12 +86,13 @@ export async function logout(refreshToken: string): Promise<void> {
 export async function createResearch(
   token: string,
   query: string,
-  mode: ResearchMode
+  mode: ResearchMode,
+  highlightEnabled = true
 ): Promise<CreateRunResponse> {
   const res = await fetch(`${API_URL}/api/v1/research`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify({ query, mode }),
+    body: JSON.stringify({ query, mode, highlight_enabled: highlightEnabled }),
   });
   return handleResponse<CreateRunResponse>(res);
 }

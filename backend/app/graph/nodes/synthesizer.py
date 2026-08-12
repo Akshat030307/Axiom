@@ -4,6 +4,7 @@ import uuid
 
 from sqlalchemy import select
 
+from app.config import get_settings
 from app.graph.nodes._prompts import load_prompt
 from app.graph.run_context import NodeResult, RunContext
 from app.graph.state import ResearchState
@@ -11,9 +12,15 @@ from app.models.db_models import Source as SourceRow
 from app.models.schemas import Contradiction, Evidence, Figure
 from app.observability.tracer import traced
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = load_prompt("synthesizer.md")
+# Kept as a separate fragment, appended only when the run's highlight toggle
+# is on, rather than baked into synthesizer.md — no point spending the
+# model's effort on an instruction that _cap_and_clean_highlights would just
+# undo for a run that opted out.
+HIGHLIGHTING_PROMPT = load_prompt("synthesizer_highlighting.md")
 
 # Matches either of the two sections this module appends after the model's
 # response — used both to strip a model-authored attempt at either (models
@@ -21,6 +28,11 @@ SYSTEM_PROMPT = load_prompt("synthesizer.md")
 # to exclude both from the armed citation heuristic.
 APPENDED_SECTION_HEADING_RE = re.compile(r"^#{1,6}\s*(Sources|Contradictions(\s+Noted)?)\s*$", re.IGNORECASE | re.MULTILINE)
 FIGURE_MARKDOWN_RE = re.compile(r"!\[([^\]]*)\]\(figure://([^)\s]+)\)")
+# A highlighted span never crosses a line/paragraph break (excluding \n keeps
+# a run-on model from wrapping several sentences, or a whole paragraph, as
+# "one" highlight — see _cap_and_clean_highlights).
+HIGHLIGHT_RE = re.compile(r"==([^=\n]+)==")
+MAX_HIGHLIGHT_CHARS = 220
 
 
 async def _fetch_sources_by_id(ctx: RunContext, source_ids: set[str]) -> dict[str, SourceRow]:
@@ -74,6 +86,25 @@ def _strip_invalid_figure_refs(content: str, valid_figure_ids: set[str]) -> str:
         return ""
 
     return FIGURE_MARKDOWN_RE.sub(_replace, content)
+
+
+def _cap_and_clean_highlights(content: str, max_highlights: int) -> str:
+    """Defensive, same rationale as every other post-processing step here:
+    a prompt instruction ("at most one per section") isn't a guarantee, so
+    this enforces it in code. Unwraps (strips the delimiters, keeps the
+    words) rather than deletes — a highlight past the cap or too long to be
+    "a sentence" should still read as normal prose, not vanish."""
+    kept = 0
+
+    def _replace(match: "re.Match[str]") -> str:
+        nonlocal kept
+        text = match.group(1)
+        if len(text) > MAX_HIGHLIGHT_CHARS or kept >= max_highlights:
+            return text
+        kept += 1
+        return match.group(0)
+
+    return HIGHLIGHT_RE.sub(_replace, content)
 
 
 def _strip_model_appended_sections(content: str) -> str:
@@ -193,6 +224,10 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
     figures = [fig for fig in (state.get("figures") or []) if not fig.paired_figure_id]
     sources_by_id = await _fetch_sources_by_id(ctx, {ev.source_id for ev in selected})
     evidence_by_id = {ev.id: ev for ev in selected}
+    # Defaults true — every existing caller (and every run created before
+    # this toggle existed) keeps today's behavior unless it opts out.
+    highlight_enabled = state.get("highlight_enabled", True)
+    system_prompt = f"{SYSTEM_PROMPT}\n\n{HIGHLIGHTING_PROMPT}" if highlight_enabled else SYSTEM_PROMPT
 
     user_prompt = (
         f"Research objective: {plan.objective}\n\n"
@@ -218,13 +253,18 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
     # stripped server-side before persistence; accepted as a documented
     # cosmetic gap for this phase (frontend should re-fetch the canonical
     # report on `done` rather than trusting accumulated chunks).
-    stream = await ctx.llm.generate_stream("synthesis", system=SYSTEM_PROMPT, user=user_prompt)
+    stream = await ctx.llm.generate_stream("synthesis", system=system_prompt, user=user_prompt)
     async for delta in stream:
         ctx.events.report_chunk(delta)
     response = stream.response
 
     body = _strip_model_appended_sections(response.content)
     body = _strip_invalid_figure_refs(body, {fig.id for fig in figures})
+    # Runs the strip pass even when disabled — belt-and-suspenders against a
+    # model that highlights anyway despite the instruction simply being
+    # absent (same reasoning as every other "don't trust an omitted
+    # instruction alone" cleanup in this file).
+    body = _cap_and_clean_highlights(body, settings.MAX_HIGHLIGHTS_PER_REPORT if highlight_enabled else 0)
     sections = [body]
     contradictions_section = _build_contradictions_section(contradictions, evidence_by_id)
     if contradictions_section:

@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     MAX_FACT_CHECKS_QUICK: int = 10
     MAX_FACT_CHECKS_DEEP: int = 40
     MAX_FIGURES_PER_REPORT: int = 6
+    # A report where every sentence is highlighted has highlighted nothing —
+    # enforced in code (synthesizer.py strips the delimiters off any
+    # highlight past this count), not just left to the prompt.
+    MAX_HIGHLIGHTS_PER_REPORT: int = 6
     MAX_CITATION_RETRIES: int = 2
     # Illustrations cost per-image (flat, not token-based — see NodeResult.
     # cost_override in image_generator.py) and are unverifiable by design (no

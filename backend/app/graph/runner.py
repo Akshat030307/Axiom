@@ -16,7 +16,9 @@ from app.observability.tracer import publish_final_stat
 logger = logging.getLogger(__name__)
 
 
-async def execute_research_run(run_id: uuid.UUID, user_id: uuid.UUID, query: str, mode: str) -> None:
+async def execute_research_run(
+    run_id: uuid.UUID, user_id: uuid.UUID, query: str, mode: str, highlight_enabled: bool = True
+) -> None:
     """Entry point for the FastAPI BackgroundTask that runs a research graph.
 
     Phase 1 has no Celery worker (see the compose scope: postgres, redis,
@@ -46,6 +48,7 @@ async def execute_research_run(run_id: uuid.UUID, user_id: uuid.UUID, query: str
             "user_id": str(user_id),
             "query": query,
             "mode": mode,
+            "highlight_enabled": highlight_enabled,
             "raw_findings": [],
             "evidence": [],
             "figures": [],

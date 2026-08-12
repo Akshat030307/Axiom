@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/v1/research", tags=["research"])
 class CreateRunRequest(BaseModel):
     query: str
     mode: ResearchMode = "quick"
+    highlight_enabled: bool = True
 
 
 class CreateRunResponse(BaseModel):
@@ -28,6 +29,7 @@ class RunStatusResponse(BaseModel):
     run_id: uuid.UUID
     status: str
     mode: str
+    highlight_enabled: bool
     query: str
     started_at: datetime
     completed_at: datetime | None
@@ -44,6 +46,7 @@ class RunStatusResponse(BaseModel):
             run_id=run.id,
             status=run.status,
             mode=run.mode,
+            highlight_enabled=run.highlight_enabled,
             query=run.query,
             started_at=run.started_at,
             completed_at=run.completed_at,
@@ -69,12 +72,21 @@ async def create_research(
     db: AsyncSession = Depends(get_db),
 ) -> CreateRunResponse:
     run_id = uuid.uuid4()
-    db.add(ResearchRun(id=run_id, user_id=user.id, query=body.query, mode=body.mode, status="pending"))
+    db.add(
+        ResearchRun(
+            id=run_id,
+            user_id=user.id,
+            query=body.query,
+            mode=body.mode,
+            highlight_enabled=body.highlight_enabled,
+            status="pending",
+        )
+    )
     await db.commit()
 
     # Runs entirely detached from this request's DB session — see
     # app/graph/runner.py's docstring for why it opens its own.
-    background_tasks.add_task(execute_research_run, run_id, user.id, body.query, body.mode)
+    background_tasks.add_task(execute_research_run, run_id, user.id, body.query, body.mode, body.highlight_enabled)
     return CreateRunResponse(run_id=run_id)
 
 

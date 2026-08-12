@@ -4,6 +4,7 @@ from datetime import datetime
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -50,6 +51,7 @@ class ResearchRun(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     query: Mapped[str] = mapped_column(Text, nullable=False)
     mode: Mapped[str] = mapped_column(Text, nullable=False)
+    highlight_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     status: Mapped[str] = mapped_column(Text, nullable=False)
     plan: Mapped[dict | None] = mapped_column(JSONB)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

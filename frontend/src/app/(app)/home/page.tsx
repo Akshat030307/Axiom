@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Greeting } from "@/components/home/Greeting";
 import { ResearchInput } from "@/components/home/ResearchInput";
 import { ModeSelector } from "@/components/home/ModeSelector";
+import { HighlightToggle } from "@/components/home/HighlightToggle";
 import { LiveRunCard } from "@/components/home/LiveRunCard";
 import { RecentResearch } from "@/components/home/RecentResearch";
 import { QuoteCard } from "@/components/home/QuoteCard";
@@ -20,6 +21,7 @@ export default function HomePage() {
 
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<ResearchMode>("deep");
+  const [highlightEnabled, setHighlightEnabled] = useState(true);
   const [focusedRunId, setFocusedRunId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export default function HomePage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.createResearch(accessToken, query.trim(), mode);
+      const res = await api.createResearch(accessToken, query.trim(), mode, highlightEnabled);
       setFocusedRunId(res.run_id);
       setQuery("");
       void queryClient.invalidateQueries({ queryKey: ["history"] });
@@ -55,7 +57,7 @@ export default function HomePage() {
     } finally {
       setSubmitting(false);
     }
-  }, [accessToken, query, mode, submitting, queryClient]);
+  }, [accessToken, query, mode, highlightEnabled, submitting, queryClient]);
 
   if (!user) return null;
 
@@ -68,7 +70,10 @@ export default function HomePage() {
 
         <div className="flex flex-col gap-4">
           <ResearchInput value={query} onChange={setQuery} onSubmit={handleSubmit} disabled={submitting} />
-          <ModeSelector value={mode} onChange={setMode} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ModeSelector value={mode} onChange={setMode} />
+            <HighlightToggle value={highlightEnabled} onChange={setHighlightEnabled} />
+          </div>
           {error && <p className="text-sm text-fg-muted">{error}</p>}
         </div>
 

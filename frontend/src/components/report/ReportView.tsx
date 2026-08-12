@@ -77,6 +77,27 @@ export function ReportView({ markdown, citations, evidenceById, figuresById }: R
     });
   }
 
+  // synthesizer.py wraps its one key-takeaway sentence per section in
+  // ==...==, with the citation marker included inside the delimiters — so
+  // this splits on the highlight first, then runs citation-parsing on
+  // whatever text lands inside (and outside) it.
+  function withHighlights(children: ReactNode): ReactNode {
+    return Children.map(children, (child) => {
+      if (typeof child !== "string") return child;
+      const parts = child.split(/(==[^=\n]+==)/g);
+      if (parts.length === 1) return withCitations(child);
+      return parts.map((part, i) => {
+        const match = /^==([^=\n]+)==$/.exec(part);
+        if (!match) return <Fragment key={i}>{withCitations(part)}</Fragment>;
+        return (
+          <mark key={i} className="rounded-sm bg-accent/20 px-0.5 text-fg">
+            {withCitations(match[1])}
+          </mark>
+        );
+      });
+    });
+  }
+
   const activeCitation = openMarker != null ? citationByMarker.get(openMarker) ?? null : null;
   const activeEvidence = activeCitation ? evidenceById.get(activeCitation.evidence_id) ?? null : null;
 
@@ -90,7 +111,24 @@ export function ReportView({ markdown, citations, evidenceById, figuresById }: R
           // `figure://{id}` src before the custom `img` renderer ever sees it.
           urlTransform={(url) => (url.startsWith("figure://") ? url : defaultUrlTransform(url))}
           components={{
-            p: ({ children }) => <p>{withCitations(children)}</p>,
+            p: ({ node, children }) => {
+              // A paragraph whose only content is a `figure://` image gets
+              // swapped for ReportFigure below, which renders block-level
+              // markup (a div wrapping <figure>/<figcaption>, two of them
+              // side by side for a paired photo) — invalid nested inside the
+              // <p> react-markdown wraps every image in by default, and a
+              // real hydration error, not just a lint nitpick. Render it
+              // unwrapped in that one case; every other paragraph is
+              // untouched.
+              const onlyChild = node?.children?.length === 1 ? node.children[0] : null;
+              const isFigureOnly =
+                onlyChild?.type === "element" &&
+                onlyChild.tagName === "img" &&
+                typeof onlyChild.properties?.src === "string" &&
+                onlyChild.properties.src.startsWith("figure://");
+              if (isFigureOnly) return <>{children}</>;
+              return <p>{withHighlights(children)}</p>;
+            },
             li: ({ children }) => <li>{withCitations(children)}</li>,
             td: ({ children }) => <td>{withCitations(children)}</td>,
             h1: ({ children }) => <h1>{withCitations(children)}</h1>,

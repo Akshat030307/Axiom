@@ -9,10 +9,10 @@ interface ReportFigureProps {
   figureId: string;
   caption: string;
   kind: string;
-  // The real photo web_image_fetcher paired with this illustration, if any
-  // (see synthesizer.py: a paired figure never gets its own figure:// marker,
-  // so this is the only way it ever reaches the page). Only ever set when
-  // kind === "illustration".
+  // The real photo web_image_fetcher paired with this figure, if any (see
+  // synthesizer.py: a paired figure never gets its own figure:// marker, so
+  // this is the only way it ever reaches the page). Only ever set when
+  // kind === "illustration" (legacy) or kind === "reference_diagram".
   pairedPhoto?: { figureId: string; caption: string } | null;
 }
 
@@ -93,22 +93,29 @@ function FigureImage({
 }
 
 export function ReportFigure({ figureId, caption, kind, pairedPhoto }: ReportFigureProps) {
-  // An illustration has no equivalent to a chart's value-grounding check —
-  // it's never derived from evidence, so every render of one must say so,
-  // not just a comment at the node that generated it.
+  // An AI-generated illustration has no equivalent to a chart's
+  // value-grounding check — it's never derived from evidence, so every
+  // render of one must say so, not just a comment at the node that
+  // generated it. Kept for backward compatibility with reports generated
+  // before image_generator switched to finding a real diagram instead —
+  // no figure is created with this kind going forward.
   const isIllustration = kind === "illustration";
+  // A real diagram found via image_generator (Wikimedia Commons) — genuinely
+  // sourced, so it gets full-width treatment like a chart/diagram, not the
+  // small "decorative" sizing, and no AI disclaimer.
+  const isReferenceDiagram = kind === "reference_diagram";
   const displayCaption = isIllustration ? `${caption} — AI-generated illustration, not derived from evidence` : caption;
 
   // Charts/diagrams carry data and need the room to stay legible — full
-  // column width. An illustration is decorative only; sized like a small
-  // figure in a printed book, not a hero image, so it doesn't compete with
-  // the report's actual content for attention. The paired real photo (when
-  // present) renders a little larger than the illustration — it's the more
-  // credible of the two, so it shouldn't read as the lesser image.
+  // column width. A legacy AI illustration is decorative only; sized like a
+  // small figure in a printed book, not a hero image, so it doesn't compete
+  // with the report's actual content for attention. The paired real photo
+  // (when present) renders a little larger — it's the more credible of the
+  // two, so it shouldn't read as the lesser image.
   const widthClass = isIllustration ? "w-56" : "w-full";
   const photoWidthClass = "w-64";
 
-  if (isIllustration && pairedPhoto) {
+  if ((isIllustration || isReferenceDiagram) && pairedPhoto) {
     return (
       <div className="my-4 flex flex-wrap items-start justify-center gap-5">
         <FigureImage figureId={pairedPhoto.figureId} alt={pairedPhoto.caption} caption={pairedPhoto.caption} widthClass={photoWidthClass} />

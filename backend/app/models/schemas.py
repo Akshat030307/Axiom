@@ -73,7 +73,11 @@ class Contradiction(BaseModel):
 
 class Figure(BaseModel):
     id: str
-    kind: Literal["chart", "diagram", "source_image", "illustration"]
+    # "illustration" is kept for backward compatibility with figures rows
+    # created before image_generator switched from AI generation to finding
+    # a real diagram (see reference_diagram) — no new figure is ever created
+    # with kind="illustration" going forward, but old reports still have them.
+    kind: Literal["chart", "diagram", "source_image", "illustration", "reference_diagram"]
     caption: str
     alt_text: str
     file_path: str
@@ -103,23 +107,25 @@ class FigureRequest(BaseModel):
 # Deliberately its own type, not a `kind` variant of FigureRequest: chart
 # requests validate against real Evidence.numeric_value (see ChartSpec's
 # grounding check in chart_generator.py) and illustration requests cannot —
-# there is no equivalent way to verify that a generated image doesn't
-# misrepresent the evidence. Keeping the types apart means grounding-related
-# code can keep assuming "chart" without a stray branch quietly forgetting
-# to exclude illustrations.
+# image_generator finds a real, existing diagram via search rather than
+# plotting evidence values, so there's no equivalent way to verify the found
+# diagram's every detail matches the evidence, only that it matches the
+# search query. Keeping the types apart means grounding-related code can
+# keep assuming "chart" without a stray branch quietly forgetting to exclude
+# illustrations.
 class IllustrationRequest(BaseModel):
     intent: str
     evidence_ids: list[str]
     caption: str
 
 
-# Structured output of the prompt-writing step (image_generator.py) — never
-# passed directly to the image model from the planner, so a second LLM call
-# can enforce the no-text/no-numbers/no-specific-claims constraint
-# (image_prompt_writer.md) that keeps an illustration from looking like a
-# data visualization.
-class ImagePrompt(BaseModel):
-    prompt: str
+# Structured output of the search-query-writing step (image_generator.py) —
+# never passed directly to Wikimedia Commons from the planner, so a second
+# LLM call can turn a mood/subject-oriented IllustrationRequest into a
+# keyword-oriented search query real diagrams are actually indexed under
+# (diagram_search_writer.md).
+class DiagramSearchQuery(BaseModel):
+    query: str
     caption: str
 
 

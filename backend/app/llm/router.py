@@ -43,11 +43,12 @@ ROUTES: dict[str, Route] = {
     # the reasoning process headroom before it has to emit anything.
     "figure_planning": Route(tier="reasoning", effort_field="EFFORT_PLANNING", max_completion_tokens=4000),
     "chart_spec": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=1200),
-    # Illustrations (decorative only, see figures/schemas.py's IllustrationRequest
-    # docstring for why these are kept separate from figure_planning/chart_spec).
-    # illustration_planning mirrors figure_planning's tier/cap; image_prompt is a
-    # short, fast-tier call, not the image generation itself (that's a separate,
-    # non-chat OpenAI endpoint — see LLMProvider.generate_image).
+    # Real diagrams (see models/schemas.py's IllustrationRequest docstring
+    # for why these are kept separate from figure_planning/chart_spec).
+    # illustration_planning mirrors figure_planning's tier/cap; image_prompt
+    # is the short, fast-tier call that writes the Wikimedia Commons search
+    # query (image_generator.py) — not an image-generation call, despite the
+    # task name kept as-is to avoid an unrelated router churn.
     "illustration_planning": Route(tier="reasoning", effort_field="EFFORT_PLANNING", max_completion_tokens=4000),
     "image_prompt": Route(tier="fast", effort_field="EFFORT_EXTRACTION", max_completion_tokens=600),
     # diagram_spec, unlike chart_spec, isn't transcribing already-provided

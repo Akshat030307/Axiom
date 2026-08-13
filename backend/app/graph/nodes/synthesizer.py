@@ -29,10 +29,14 @@ HIGHLIGHTING_PROMPT = load_prompt("synthesizer_highlighting.md")
 APPENDED_SECTION_HEADING_RE = re.compile(r"^#{1,6}\s*(Sources|Contradictions(\s+Noted)?)\s*$", re.IGNORECASE | re.MULTILINE)
 FIGURE_MARKDOWN_RE = re.compile(r"!\[([^\]]*)\]\(figure://([^)\s]+)\)")
 # A highlighted span never crosses a line/paragraph break (excluding \n keeps
-# a run-on model from wrapping several sentences, or a whole paragraph, as
-# "one" highlight — see _cap_and_clean_highlights).
+# a run-on model from wrapping multiple paragraphs, or a whole section, as
+# "one" highlight — see _cap_and_clean_highlights). The span itself is meant
+# to hold a short, 2-3 sentence passage, not a single sentence.
 HIGHLIGHT_RE = re.compile(r"==([^=\n]+)==")
-MAX_HIGHLIGHT_CHARS = 220
+# ~3 real sentences with a trailing citation marker or two, generously
+# sized — see _cap_and_clean_highlights; still well short of a full
+# paragraph, which is the actual thing this cap guards against.
+MAX_HIGHLIGHT_CHARS = 500
 
 
 async def _fetch_sources_by_id(ctx: RunContext, source_ids: set[str]) -> dict[str, SourceRow]:
@@ -93,7 +97,7 @@ def _cap_and_clean_highlights(content: str, max_highlights: int) -> str:
     a prompt instruction ("at most one per section") isn't a guarantee, so
     this enforces it in code. Unwraps (strips the delimiters, keeps the
     words) rather than deletes — a highlight past the cap or too long to be
-    "a sentence" should still read as normal prose, not vanish."""
+    "a short passage" should still read as normal prose, not vanish."""
     kept = 0
 
     def _replace(match: "re.Match[str]") -> str:

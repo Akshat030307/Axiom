@@ -77,10 +77,10 @@ export function ReportView({ markdown, citations, evidenceById, figuresById }: R
     });
   }
 
-  // synthesizer.py wraps its one key-takeaway sentence per section in
-  // ==...==, with the citation marker included inside the delimiters — so
-  // this splits on the highlight first, then runs citation-parsing on
-  // whatever text lands inside (and outside) it.
+  // synthesizer.py wraps its one key-takeaway passage (2-3 sentences) per
+  // section in ==...==, with any citation markers included inside the
+  // delimiters — so this splits on the highlight first, then runs
+  // citation-parsing on whatever text lands inside (and outside) it.
   function withHighlights(children: ReactNode): ReactNode {
     return Children.map(children, (child) => {
       if (typeof child !== "string") return child;

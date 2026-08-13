@@ -26,9 +26,10 @@ _MD = MarkdownIt("commonmark", {"html": True}).enable("table")
 # <sup> per PRD §14 ("citation markers rendered as superscripts").
 _CITATION_MARKERS_RE = re.compile(r"((?:\[\d+\])+)")
 _FIGURE_MD_RE = re.compile(r"!\[([^\]]*)\]\(figure://([^)]*)\)")
-# synthesizer.py's one key-takeaway sentence per section — same delimiter and
-# same "never crosses a line" reasoning as ReportView.tsx's client-side parse
-# (see synthesizer.py's HIGHLIGHT_RE), applied here for the PDF export path.
+# synthesizer.py's one key-takeaway passage (2-3 sentences) per section —
+# same delimiter and same "never crosses a line" reasoning as ReportView.tsx's
+# client-side parse (see synthesizer.py's HIGHLIGHT_RE), applied here for the
+# PDF export path.
 _HIGHLIGHT_RE = re.compile(r"==([^=\n]+)==")
 
 _ALLOWED_TAGS = [
@@ -113,12 +114,13 @@ def _inline_figures(markdown: str, figures_by_id: dict[str, Figure]) -> str:
     synthesizer already strips unknown ids before persisting the report, so
     this only fires for a figure file that's gone missing on disk.
 
-    An illustration with a paired real photo (web_image_fetcher.py) renders
-    both side by side, same pairing ReportFigure.tsx does on the live page —
-    the photo never has its own figure:// marker (synthesizer.py excludes
-    paired figures from the model's prompt), so this is the only place it
-    gets attached to the export."""
-    paired_by_illustration_id = {
+    A figure with a paired real photo (web_image_fetcher.py — an AI
+    illustration in legacy reports, a real reference_diagram in current
+    ones) renders both side by side, same pairing ReportFigure.tsx does on
+    the live page — the photo never has its own figure:// marker
+    (synthesizer.py excludes paired figures from the model's prompt), so
+    this is the only place it gets attached to the export."""
+    paired_by_figure_id = {
         fig.paired_figure_id: fig for fig in figures_by_id.values() if fig.paired_figure_id
     }
 
@@ -128,12 +130,15 @@ def _inline_figures(markdown: str, figures_by_id: dict[str, Figure]) -> str:
         if figure is None:
             return f'<div class="figure-placeholder">{caption} — not available in this export</div>'
 
-        # Same rule as ReportFigure.tsx: an illustration has no equivalent to
-        # a chart's value-grounding check, so every render says so — the PDF
-        # export path can't rely on frontend code to add this.
+        # Same rule as ReportFigure.tsx: a legacy AI illustration has no
+        # equivalent to a chart's value-grounding check, so every render
+        # says so — the PDF export path can't rely on frontend code to add
+        # this. A reference_diagram is a real, found image, so it gets no
+        # disclaimer and full-width sizing like a chart/diagram.
         is_illustration = figure.kind == "illustration"
+        has_paired_photo = figure.kind in ("illustration", "reference_diagram")
         illustration_caption = f"{caption} — AI-generated illustration, not derived from evidence" if is_illustration else caption
-        # Charts carry data and need the room to stay legible; an
+        # Charts carry data and need the room to stay legible; a legacy
         # illustration is decorative only, sized like a small figure in a
         # printed book rather than a hero image (same distinction
         # ReportFigure.tsx makes on the frontend). Its paired photo — the
@@ -143,7 +148,7 @@ def _inline_figures(markdown: str, figures_by_id: dict[str, Figure]) -> str:
         if illustration_html is None:
             return f'<div class="figure-placeholder">{caption} — not available in this export</div>'
 
-        photo = paired_by_illustration_id.get(figure.id) if is_illustration else None
+        photo = paired_by_figure_id.get(figure.id) if has_paired_photo else None
         photo_html = _figure_html(photo, _strip_text(photo.caption), "figure-photo") if photo else None
         if photo_html is None:
             return illustration_html

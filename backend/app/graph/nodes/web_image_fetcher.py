@@ -20,17 +20,17 @@ def _domain_of(url: str) -> str:
     return urlparse(url).hostname or "web"
 
 
-async def _fetch_one(ctx: RunContext, illustration: Figure) -> Figure | None:
+async def _fetch_one(ctx: RunContext, diagram: Figure) -> Figure | None:
     """Tries up to WEB_IMAGE_SEARCH_CANDIDATES Tavily image results, in
-    ranked order, for the illustration's caption — returns the first one
-    that passes SSRF + content-type + dimension validation, or None if none
-    do (or the search itself fails). Non-fatal either way: the illustration
-    stands alone without a paired photo."""
+    ranked order, for the diagram's caption — returns the first one that
+    passes SSRF + content-type + dimension validation, or None if none do
+    (or the search itself fails). Non-fatal either way: the diagram stands
+    alone without a paired photo."""
     try:
-        candidates = await search_images(illustration.caption, max_results=settings.WEB_IMAGE_SEARCH_CANDIDATES)
+        candidates = await search_images(diagram.caption, max_results=settings.WEB_IMAGE_SEARCH_CANDIDATES)
     except Exception as exc:
         logger.warning(
-            "web_image_fetcher[%s]: image search failed for %r: %s", ctx.run_id, illustration.caption, exc
+            "web_image_fetcher[%s]: image search failed for %r: %s", ctx.run_id, diagram.caption, exc
         )
         return None
 
@@ -46,38 +46,39 @@ async def _fetch_one(ctx: RunContext, illustration: Figure) -> Figure | None:
         return Figure(
             id=str(uuid.uuid4()),
             kind="source_image",
-            caption=illustration.caption,
-            alt_text=candidate.get("description") or illustration.caption,
+            caption=diagram.caption,
+            alt_text=candidate.get("description") or diagram.caption,
             file_path=file_path,
             mime_type=content_type,
             spec=None,
-            evidence_ids=illustration.evidence_ids,
+            evidence_ids=diagram.evidence_ids,
             source_id=None,
             license_note=f"Photo via {_domain_of(url)}",
-            paired_figure_id=illustration.id,
+            paired_figure_id=diagram.id,
         )
     return None
 
 
 @traced("web_image_fetcher")
 async def web_image_fetcher_node(state: ResearchState, ctx: RunContext) -> NodeResult:
-    """For every AI illustration image_generator produced this run, finds a
-    real, relevant photo via Tavily image search and pairs it (kind=
-    "source_image", paired_figure_id=<illustration id>) so the frontend can
-    render both together at a similar size. Excluded from the figure list
-    synthesizer sees (see synthesizer.py's _format_figure_list) — the
-    illustration's own figure:// marker is enough; the paired photo renders
+    """For every real reference diagram image_generator found this run,
+    finds a real, relevant photo via Tavily image search and pairs it (kind=
+    "source_image", paired_figure_id=<diagram id>) so the frontend can
+    render both together — e.g. a real photo of a battery pack next to a
+    real cross-section diagram of its internals. Excluded from the figure
+    list synthesizer sees (see synthesizer.py's _format_figure_list) — the
+    diagram's own figure:// marker is enough; the paired photo renders
     automatically alongside it rather than needing its own marker the model
     might place somewhere unrelated or skip entirely."""
-    illustrations = [f for f in state.get("figures") or [] if f.kind == "illustration"]
+    diagrams = [f for f in state.get("figures") or [] if f.kind == "reference_diagram"]
 
-    if not illustrations:
-        return NodeResult(state_update={"figures": []}, trace_input={"note": "no illustrations to pair"})
+    if not diagrams:
+        return NodeResult(state_update={"figures": []}, trace_input={"note": "no diagrams to pair"})
 
     figures: list[Figure] = []
     failed = 0
-    for illustration in illustrations:
-        figure = await _fetch_one(ctx, illustration)
+    for diagram in diagrams:
+        figure = await _fetch_one(ctx, diagram)
         if figure is None:
             failed += 1
             continue
@@ -102,5 +103,5 @@ async def web_image_fetcher_node(state: ResearchState, ctx: RunContext) -> NodeR
 
     return NodeResult(
         state_update={"figures": figures},
-        trace_input={"illustrations": len(illustrations), "paired": len(figures), "failed": failed},
+        trace_input={"diagrams": len(diagrams), "paired": len(figures), "failed": failed},
     )

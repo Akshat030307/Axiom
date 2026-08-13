@@ -1,4 +1,3 @@
-import base64
 import logging
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, TypeVar
@@ -290,17 +289,3 @@ class LLMProvider:
         input_tokens = response.usage.prompt_tokens if response.usage else 0
         return EmbedResponse(vectors=vectors, input_tokens=input_tokens, model=self._settings.OPENAI_EMBEDDING_MODEL)
 
-    async def generate_image(self, prompt: str) -> bytes:
-        """Flat per-image pricing (app.config.IMAGE_COST_PER_IMAGE_USD), not
-        token-based — callers apply that cost via NodeResult.cost_override
-        rather than PRICING/estimate_cost(), which only knows how to price
-        input/output tokens. GPT image models always return base64 (no
-        response_format param — that's DALL-E-2/3 only)."""
-        response = await self._client.images.generate(
-            model=self._settings.OPENAI_IMAGE_MODEL,
-            prompt=prompt,
-            quality=self._settings.IMAGE_QUALITY,
-            size="1024x1024",
-            n=1,
-        )
-        return base64.b64decode(response.data[0].b64_json)

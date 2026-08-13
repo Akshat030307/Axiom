@@ -61,26 +61,29 @@ def build_graph(ctx: RunContext, checkpointer: BaseCheckpointSaver) -> CompiledS
     illustration_planner/image_generator run right after chart_generator, one
     hop later in the same "before synthesizer" region — same reason, but kept
     as a fully separate node pair (not folded into figure_planner/
-    chart_generator) because illustrations have no equivalent to
-    chart_generator's value-grounding check: there's no way to verify a
-    generated image doesn't misrepresent the evidence, so that pipeline is
-    deliberately isolated rather than sharing types/validation with the
-    chart pipeline. diagram_generator remains out of scope.
+    chart_generator) because image_generator finds a real, existing diagram
+    (Wikimedia Commons search) rather than plotting evidence values, so it
+    has no equivalent to chart_generator's value-grounding check — there's
+    no way to verify a found diagram's every detail matches the evidence,
+    only that it matches the search query. That pipeline is deliberately
+    isolated rather than sharing types/validation with the chart pipeline.
 
-    web_image_fetcher runs right after image_generator, pairing each AI
-    illustration with a real photo found via Tavily image search — a
-    lightweight stand-in for the PRD's original image_harvester (which
-    scraped <img> tags from already-fetched pages and was never built).
-    Depends on image_generator's output (it pairs against the illustrations
-    that node just produced), so it can't run any earlier in this region.
+    web_image_fetcher runs right after image_generator, pairing each real
+    reference diagram with a real photo found via Tavily image search — e.g.
+    a photo of an actual battery pack next to a real cross-section diagram
+    of its internals. A lightweight stand-in for the PRD's original
+    image_harvester (which scraped <img> tags from already-fetched pages and
+    was never built). Depends on image_generator's output (it pairs against
+    the diagrams that node just found), so it can't run any earlier in this
+    region.
 
     diagram_generator sits right after chart_generator, both consuming
     figure_planner's output (chart_generator filters to kind="chart",
     diagram_generator to kind="diagram") — grouped with the
-    evidence-grounded figure pipeline rather than the illustration/photo
+    evidence-grounded figure pipeline rather than the reference-diagram/photo
     pipeline, since a diagram is Mermaid source the model wrote (rendered
-    deterministically by mmdc, not by an image-generation model) and is
-    meant to be factually accurate, unlike an illustration.
+    deterministically by mmdc), describing structure/flow rather than a
+    physical/spatial layout.
     """
     builder = StateGraph(ResearchState)
 

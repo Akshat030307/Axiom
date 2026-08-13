@@ -61,26 +61,19 @@ class Settings(BaseSettings):
     # A report where every sentence is highlighted has highlighted nothing —
     # enforced in code (synthesizer.py strips the delimiters off any
     # highlight past this count), not just left to the prompt.
-    MAX_HIGHLIGHTS_PER_REPORT: int = 6
+    MAX_HIGHLIGHTS_PER_REPORT: int = 9
     MAX_CITATION_RETRIES: int = 2
-    # Illustrations cost per-image (flat, not token-based — see NodeResult.
-    # cost_override in image_generator.py) and are unverifiable by design (no
-    # equivalent to chart_generator's value-grounding check exists for
-    # generated pixels), so the cap is deliberately much lower than
-    # MAX_FIGURES_PER_REPORT. gpt-image-1-mini at "low" quality prices at
-    # ~$0.005/image — raising OPENAI_IMAGE_MODEL/IMAGE_QUALITY without also
-    # updating IMAGE_COST_PER_IMAGE_USD will under-report real spend to the
-    # cost ceiling.
-    OPENAI_IMAGE_MODEL: str = "gpt-image-1-mini"
-    IMAGE_QUALITY: str = "low"
-    IMAGE_COST_PER_IMAGE_USD: float = 0.005
+    # image_generator finds a real, existing diagram/schematic (Wikimedia
+    # Commons) rather than generating pixels, so there's no per-image
+    # generation cost or grounding gap to cap against the way there once was
+    # — this just bounds how many are worth the search+fetch+download cost.
     MAX_ILLUSTRATIONS_PER_REPORT: int = 2
     MAX_IMAGE_BYTES: int = 5_242_880
-    # How many Tavily image-search candidates web_image_fetcher tries (in
-    # ranked order) before giving up on finding a real photo to pair with a
-    # given illustration — most queries succeed on the first candidate; this
-    # is a fallback for when it fails validation (wrong content-type, too
-    # small, fails to decode).
+    # How many search candidates (Tavily for web_image_fetcher's real photos,
+    # Wikimedia Commons for image_generator's real diagrams) are tried, in
+    # ranked order, before giving up — most queries succeed on the first
+    # candidate; this is a fallback for when it fails validation (wrong
+    # content-type, too small, fails to decode).
     WEB_IMAGE_SEARCH_CANDIDATES: int = 3
     RUN_TIMEOUT_SECONDS: int = 900
     TOOL_TIMEOUT_SECONDS: int = 30

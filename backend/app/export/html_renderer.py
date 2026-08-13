@@ -11,10 +11,10 @@ from pathlib import Path
 
 import bleach
 from markdown_it import MarkdownIt
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.db_models import Evidence, Figure, ResearchRun, Source
+from app.models.db_models import Figure, ResearchRun
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +73,6 @@ _PAGE_CSS = """
   figure.figure-photo figcaption { max-width: 190pt; margin-left: auto; margin-right: auto; }
   .figure-pair { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 12pt; }
   figcaption { color: #666; font-size: 8.5pt; margin-top: 4pt; }
-  .sources-table td:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
-  .sources-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
 """
 
 
@@ -169,39 +167,6 @@ def _render_body_html(report_markdown: str, figures_by_id: dict[str, Figure]) ->
     )
 
 
-async def _render_sources_table(db: AsyncSession, run_id) -> str:
-    """A complete, credibility-annotated source list (PRD §14). Built from
-    `sources` directly rather than parsed out of the report markdown's own
-    numbered Sources section — that section's marker-to-row correspondence
-    matters for the reader following an in-body [n], so it's left as the
-    model/synthesizer wrote it (plain numbered list, rendered normally by
-    _render_body_html above); this is a separate, additional appendix."""
-    rows = (
-        await db.execute(
-            select(Source, func.count(Evidence.id).label("evidence_count"))
-            .outerjoin(Evidence, Evidence.source_id == Source.id)
-            .where(Source.run_id == run_id)
-            .group_by(Source.id)
-            .order_by(Source.credibility_score.desc().nulls_last())
-        )
-    ).all()
-    if not rows:
-        return "<p>No sources recorded.</p>"
-
-    lines = [
-        '<table class="sources-table"><thead><tr>'
-        "<th>Source</th><th>Domain</th><th>Credibility</th><th>Evidence items</th>"
-        "</tr></thead><tbody>"
-    ]
-    for source, evidence_count in rows:
-        title = _strip_text(source.title or source.url)
-        domain = _strip_text(source.domain or "")
-        score = f"{source.credibility_score:.2f}" if source.credibility_score is not None else "—"
-        lines.append(f"<tr><td>{title}</td><td>{domain}</td><td>{score}</td><td>{evidence_count}</td></tr>")
-    lines.append("</tbody></table>")
-    return "\n".join(lines)
-
-
 async def _fetch_figures_by_id(db: AsyncSession, run_id) -> dict[str, Figure]:
     rows = (await db.scalars(select(Figure).where(Figure.run_id == run_id))).all()
     return {str(row.id): row for row in rows}
@@ -210,7 +175,6 @@ async def _fetch_figures_by_id(db: AsyncSession, run_id) -> dict[str, Figure]:
 async def render_report_html(db: AsyncSession, run: ResearchRun, report_markdown: str) -> str:
     figures_by_id = await _fetch_figures_by_id(db, run.id)
     body_html = _render_body_html(report_markdown, figures_by_id)
-    sources_html = await _render_sources_table(db, run.id)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     # planner_node persists the plan (incl. a real report title, distinct
     # from whatever the user actually typed) onto run.plan — fall back to
@@ -230,7 +194,5 @@ async def render_report_html(db: AsyncSession, run: ResearchRun, report_markdown
 <h1 class="report-title">{title}</h1>
 <p class="report-meta">{mode} research &bull; generated {generated_at}</p>
 {body_html}
-<h2>Sources (by credibility)</h2>
-{sources_html}
 </body>
 </html>"""

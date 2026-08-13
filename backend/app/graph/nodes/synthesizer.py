@@ -21,6 +21,14 @@ SYSTEM_PROMPT = load_prompt("synthesizer.md")
 # model's effort on an instruction that _cap_and_clean_highlights would just
 # undo for a run that opted out.
 HIGHLIGHTING_PROMPT = load_prompt("synthesizer_highlighting.md")
+# Same pattern — appended only for the modes meant to go deeper than a quick
+# summary. Quick mode's existing brevity is correct as-is; nothing in
+# synthesizer.md pushes the model toward more thorough per-section coverage
+# for the other three modes today, so deep/academic/competitive reports were
+# only as long as however much evidence happened to be retrieved made them,
+# never because anything actually asked for more depth.
+DEPTH_PROMPT = load_prompt("synthesizer_depth.md")
+DEPTH_MODES = {"deep", "academic", "competitive"}
 
 # Matches either of the two sections this module appends after the model's
 # response — used both to strip a model-authored attempt at either (models
@@ -127,16 +135,42 @@ def _strip_model_appended_sections(content: str) -> str:
 def _build_sources_section(evidence: list[Evidence], sources_by_id: dict[str, SourceRow]) -> str:
     """Built entirely from real `sources` rows — the model never writes this
     section (it has no reliable way to produce correct titles/URLs and, left
-    to it, invents "not provided" placeholders instead). Numbered to match
-    the same 1-indexed positions the evidence list above used, so a citation
-    marker and its Sources entry always refer to the same item."""
-    lines = ["## Sources"]
+    to it, invents "not provided" placeholders instead). One line per unique
+    source, not per cited evidence item — `evidence` is often 30-90 items in
+    deep mode and the same strong source frequently gets cited several
+    times, so a naive one-line-per-citation version repeated the same
+    title/domain/url block over and over and was a large share of a
+    deep-mode PDF's page count for zero added information. Every citation
+    marker number that points to a given source is listed on its line, so a
+    reader can still trace any [n] in the body back to exactly one place
+    here. Deliberately comma-separated, not bracketed ("3, 7." not
+    "[3][7]") — citation_validator.py's marker regex scans the *entire*
+    report markdown, this section included, and a literal [n] here would
+    register as a phantom in-body citation for evidence the model may never
+    have actually referenced in prose.
+
+    Also carries credibility_scorer's score inline — this is now the only
+    place that score reaches the reader; the separate PDF-only "Sources (by
+    credibility)" appendix (html_renderer.py) duplicated it for every source
+    the run ever touched, not just the ones actually cited, and has been
+    removed."""
+    markers_by_source_id: dict[str, list[int]] = {}
+    order: list[str] = []
     for i, ev in enumerate(evidence, start=1):
-        source = sources_by_id.get(ev.source_id)
-        if source is None:
+        if ev.source_id not in sources_by_id:
             continue
+        if ev.source_id not in markers_by_source_id:
+            markers_by_source_id[ev.source_id] = []
+            order.append(ev.source_id)
+        markers_by_source_id[ev.source_id].append(i)
+
+    lines = ["## Sources"]
+    for source_id in order:
+        source = sources_by_id[source_id]
+        markers = ", ".join(str(n) for n in markers_by_source_id[source_id])
         title = source.title or source.domain
-        lines.append(f"{i}. {title} ({source.domain}) — {source.url}")
+        score = f"{source.credibility_score:.2f}" if source.credibility_score is not None else "—"
+        lines.append(f"{markers}. {title} ({source.domain}, credibility {score}) — {source.url}")
     return "\n".join(lines)
 
 
@@ -232,6 +266,8 @@ async def synthesizer_node(state: ResearchState, ctx: RunContext) -> NodeResult:
     # this toggle existed) keeps today's behavior unless it opts out.
     highlight_enabled = state.get("highlight_enabled", True)
     system_prompt = f"{SYSTEM_PROMPT}\n\n{HIGHLIGHTING_PROMPT}" if highlight_enabled else SYSTEM_PROMPT
+    if state["mode"] in DEPTH_MODES:
+        system_prompt = f"{system_prompt}\n\n{DEPTH_PROMPT}"
 
     user_prompt = (
         f"Research objective: {plan.objective}\n\n"
